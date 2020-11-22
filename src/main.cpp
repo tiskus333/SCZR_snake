@@ -1,69 +1,80 @@
+#include "opencv2/imgproc.hpp"
+#include "opencv2/highgui.hpp"
+#include "opencv2/videoio.hpp"
 #include <iostream>
-#include <opencv2/opencv.hpp>
-
-int main( int argc, char** argv ) {
-
-    //Open the default video camera
-    cv::VideoCapture cap(0);
-
-    // if not success, exit program
-    if (cap.isOpened() == false)  
-    {
-        std::cout << "Cannot open the video camera" << std::endl;
-        std::cin.get(); //wait for any key press
-        return -1;
-    } 
-
-    double dWidth = cap.get(cv::CAP_PROP_FRAME_WIDTH); //get the width of frames of the video
-    double dHeight = cap.get(cv::CAP_PROP_FRAME_HEIGHT); //get the height of frames of the video
-
-    std::cout << "Resolution of the video : " << dWidth << " x " << dHeight << std::endl;
-
-    // std::string window_name = "My Camera Feed";
-    // cv::namedWindow(window_name); //create a window called "My Camera Feed"
-    
-    cv::Mat frame, fgMask, bgMask;
-    cv::Ptr<cv::BackgroundSubtractor> pBackSub = cv::createBackgroundSubtractorMOG2(500, 32.0, false);
-
-     //cap.read(fgMask);
-    // pBackSub->apply(frame, fgMask);
-
-    while (true)
-    {
-        bool bSuccess = cap.read(frame); // read a new frame from video 
-
-        //Breaking the while loop if the frames cannot be captured
-        if (bSuccess == false) 
+using namespace cv;
+const int max_value_H = 360/2;
+const int max_value = 255;
+const String window_capture_name = "Video Capture";
+const String window_detection_name = "Object Detection";
+int low_H = 0, low_S = 0, low_V = 0;
+int high_H = max_value_H, high_S = max_value, high_V = max_value;
+static void on_low_H_thresh_trackbar(int, void *)
+{
+    low_H = min(high_H-1, low_H);
+    setTrackbarPos("Low H", window_detection_name, low_H);
+}
+static void on_high_H_thresh_trackbar(int, void *)
+{
+    high_H = max(high_H, low_H+1);
+    setTrackbarPos("High H", window_detection_name, high_H);
+}
+static void on_low_S_thresh_trackbar(int, void *)
+{
+    low_S = min(high_S-1, low_S);
+    setTrackbarPos("Low S", window_detection_name, low_S);
+}
+static void on_high_S_thresh_trackbar(int, void *)
+{
+    high_S = max(high_S, low_S+1);
+    setTrackbarPos("High S", window_detection_name, high_S);
+}
+static void on_low_V_thresh_trackbar(int, void *)
+{
+    low_V = min(high_V-1, low_V);
+    setTrackbarPos("Low V", window_detection_name, low_V);
+}
+static void on_high_V_thresh_trackbar(int, void *)
+{
+    high_V = max(high_V, low_V+1);
+    setTrackbarPos("High V", window_detection_name, high_V);
+}
+int main(int argc, char* argv[])
+{
+    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
+    namedWindow(window_capture_name);
+    namedWindow(window_detection_name);
+    // Trackbars to set thresholds for HSV values
+    createTrackbar("Low H", window_detection_name, &low_H, max_value_H, on_low_H_thresh_trackbar);
+    createTrackbar("High H", window_detection_name, &high_H, max_value_H, on_high_H_thresh_trackbar);
+    createTrackbar("Low S", window_detection_name, &low_S, max_value, on_low_S_thresh_trackbar);
+    createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar);
+    createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
+    createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
+    Mat frame, frame_HSV, frame_threshold;
+    while (true) {
+        cap >> frame;
+        if(frame.empty())
         {
-            std::cout << "Video camera is disconnected" << std::endl;
-            std::cin.get(); //Wait for any key press
             break;
         }
-
-        //show the frame in the created window
-        //imshow(window_name, frame);
-
-        if (cv::waitKey(10) == 's')
+        blur(frame,frame,Size(5,5));
+        // Convert from BGR to HSV colorspace
+        cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
+        // Detect the object based on HSV Range Values
+        inRange(frame_HSV, Scalar(low_H, low_S, low_V), Scalar(high_H, high_S, high_V), frame_threshold);
+        // Show the frames
+        flip(frame,frame,1);
+        flip(frame_threshold,frame_threshold,1);
+        cv::erode(frame_threshold, frame_threshold,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5,5))); 
+        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5,5)));
+        imshow(window_capture_name, frame);
+        imshow(window_detection_name, frame_threshold);
+        char key = (char) waitKey(30);
+        if (key == 'q' || key == 27)
         {
-           pBackSub->apply(frame,frame,1);
-        }
-        //cv::absdiff(frame, fgMask, bgMask);
-        pBackSub->apply(frame, fgMask,0);
-        cv::imshow("Frame", frame);
-        cv::imshow("FG Mask", fgMask);
-        //cv::imshow("BG Mask", bgMask);
-
-        //wait for for 10 ms until any key is pressed.  
-        //If the 'Esc' key is pressed, break the while loop.
-        //If the any other key is pressed, continue the loop 
-        //If any key is not pressed withing 10 ms, continue the loop 
-        if (cv::waitKey(10) == 27)
-        {
-            std::cout << "Esc key is pressed by user. Stoppig the video" << std::endl;
             break;
         }
     }
-
     return 0;
-
 }
