@@ -51,7 +51,10 @@ int main(int argc, char* argv[])
     createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar);
     createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
     createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
-    Mat frame, frame_HSV, frame_threshold;
+    Mat frame, frame_HSV, frame_threshold, color_contour;
+    std::vector<std::vector<cv::Point> > contours, contours_poly;
+    cv::Point2f center;
+    float radius;
     while (true) {
         cap >> frame;
         if(frame.empty())
@@ -66,8 +69,26 @@ int main(int argc, char* argv[])
         // Show the frames
         flip(frame,frame,1);
         flip(frame_threshold,frame_threshold,1);
-        cv::erode(frame_threshold, frame_threshold,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5,5))); 
-        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5,5)));
+        cv::erode(frame_threshold, frame_threshold,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(15,15))); 
+        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(15,15)));
+        cv::findContours(frame_threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+        for(int i =0; i<contours.size();++i)
+            cv::drawContours(frame,contours,i,cv::Scalar(255,255,255));
+        try
+        {
+        //approxPolyDP(contours,contours_poly,3,true);
+        cv::minEnclosingCircle(contours,center,radius);
+        //auto rect = cv::boundingRect(contours_poly);
+        //if(rect.area())
+        //cv::rectangle(frame,rect, Scalar(255,0,0),3);
+        //if(radius > 10)
+        cv::circle(frame,center,radius,cv::Scalar(255,0,0));
+
+        }
+        catch(const cv::Exception& e)
+        {
+            //std::cout<<e.what();
+        }
         imshow(window_capture_name, frame);
         imshow(window_detection_name, frame_threshold);
         char key = (char) waitKey(30);
