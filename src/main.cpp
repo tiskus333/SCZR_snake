@@ -1,13 +1,13 @@
-#include "opencv2/imgproc.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/videoio.hpp"
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/videoio.hpp>
 #include <iostream>
 using namespace cv;
-const int max_value_H = 360/2;
+const int max_value_H = 180;
 const int max_value = 255;
 const String window_capture_name = "Video Capture";
 const String window_detection_name = "Object Detection";
-int low_H = 0, low_S = 0, low_V = 0;
+int low_H = 160, low_S = 100, low_V = 100;
 int high_H = max_value_H, high_S = max_value, high_V = max_value;
 static void on_low_H_thresh_trackbar(int, void *)
 {
@@ -39,9 +39,12 @@ static void on_high_V_thresh_trackbar(int, void *)
     high_V = max(high_V, low_V+1);
     setTrackbarPos("High V", window_detection_name, high_V);
 }
-int main(int argc, char* argv[])
+int main()
 {
-    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
+    VideoCapture cap(0);
+    if(cap.isOpened()) CV_Assert("Cam opened failed");
+    cap.set(CAP_PROP_FRAME_WIDTH, 640);
+    cap.set(CAP_PROP_FRAME_HEIGHT,480);
     namedWindow(window_capture_name);
     namedWindow(window_detection_name);
     // Trackbars to set thresholds for HSV values
@@ -52,16 +55,14 @@ int main(int argc, char* argv[])
     createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
     createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
     Mat frame, frame_HSV, frame_threshold, color_contour;
-    std::vector<std::vector<cv::Point> > contours, contours_poly;
-    cv::Point2f center;
-    float radius;
+    std::vector<std::vector<Point>> contours;
     while (true) {
         cap >> frame;
         if(frame.empty())
         {
             break;
         }
-        blur(frame,frame,Size(5,5));
+        medianBlur(frame,frame,15);
         // Convert from BGR to HSV colorspace
         cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
         // Detect the object based on HSV Range Values
@@ -69,25 +70,44 @@ int main(int argc, char* argv[])
         // Show the frames
         flip(frame,frame,1);
         flip(frame_threshold,frame_threshold,1);
-        cv::erode(frame_threshold, frame_threshold,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(15,15))); 
-        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(15,15)));
-        cv::findContours(frame_threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-        for(int i =0; i<contours.size();++i)
-            cv::drawContours(frame,contours,i,cv::Scalar(255,255,255));
+        // dilate(frame_threshold, frame_threshold, getStructuringElement(MorphShapes::MORPH_RECT, Size(3,3)));
+        // erode(frame_threshold, frame_threshold,getStructuringElement(MorphShapes::MORPH_RECT, Size(3,3))); 
+
+
+        // erode(frame_threshold, frame_threshold,getStructuringElement(MorphShapes::MORPH_RECT, Size(3,3))); 
+        // dilate(frame_threshold, frame_threshold, getStructuringElement(MorphShapes::MORPH_RECT, Size(3,3)));
+
+        morphologyEx(frame_threshold,frame_threshold,MORPH_OPEN,getStructuringElement(MorphShapes::MORPH_RECT, Size(10,10)));
+        morphologyEx(frame_threshold,frame_threshold,MORPH_CLOSE,getStructuringElement(MorphShapes::MORPH_RECT, Size(10,10)));
+        findContours(frame_threshold, contours, RETR_TREE, CHAIN_APPROX_SIMPLE);
+
+        for(size_t i =0; i<contours.size();++i)
+            drawContours(frame,contours,i,Scalar(255,255,255));
+        
+        std::vector<std::vector<Point>> contours_poly(contours.size());
+        std::vector<std::pair<Point2f,float>> circles(contours.size()); 
         try
         {
-        //approxPolyDP(contours,contours_poly,3,true);
-        cv::minEnclosingCircle(contours,center,radius);
-        //auto rect = cv::boundingRect(contours_poly);
-        //if(rect.area())
-        //cv::rectangle(frame,rect, Scalar(255,0,0),3);
-        //if(radius > 10)
-        cv::circle(frame,center,radius,cv::Scalar(255,0,0));
-
+            for(size_t i = 0; i < contours.size(); ++i)
+            {
+                approxPolyDP(contours[i],contours_poly[i],3,true);
+                minEnclosingCircle(contours[i],circles[i].first,circles[i].second);
+                //auto rect = boundingRect(contours_poly);
+                //if(rect.area())
+                //rectangle(frame,rect, Scalar(255,0,0),3);
+                //if(radiuses[i] > 10)
+                //circle(frame,centers[i],radiuses[i],Scalar(255,0,0));
+            }
         }
-        catch(const cv::Exception& e)
+        catch(const Exception& e)
         {
-            //std::cout<<e.what();
+            std::cout<<e.what();
+        }
+        std::sort(circles.begin(), circles.end(),[](const auto &x, const auto &y){return y.second < x.second;});
+        if(circles.size() > 0 )
+        {
+            circle(frame, circles[0].first,circles[0].second,{255,0,0});
+            circle(frame, circles[0].first,1,{0,0,255});
         }
         imshow(window_capture_name, frame);
         imshow(window_detection_name, frame_threshold);
@@ -97,5 +117,6 @@ int main(int argc, char* argv[])
             break;
         }
     }
+    cap.release();
     return 0;
 }
