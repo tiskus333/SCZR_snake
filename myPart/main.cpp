@@ -133,12 +133,12 @@ main(int argc, char *argv[])
                 if (isDead)
                     break;
             }
-        }
 
-        if (gameFruit.checkIfEaten(gameSnake.snakeBody.back()))
-        {
-            gameSnake.incAllowedLength();
-            gameFruit.generatePoint();
+            if (gameFruit.checkIfEaten(gameSnake.snakeBody.back()))
+            {
+                gameSnake.incAllowedLength();
+                gameFruit.generatePoint();
+            }
         }
     }
 }
