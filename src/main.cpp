@@ -1,69 +1,134 @@
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/videoio.hpp>
 #include <iostream>
-#include <opencv2/opencv.hpp>
 
-int main( int argc, char** argv ) {
+const int max_value_H = 180;
+const int max_value = 255;
+const std::string window_capture_name = "Video Capture";
+const std::string window_detection_name = "Object Detection";
+int low_H = 160, low_S = 100, low_V = 100;
+int high_H = max_value_H, high_S = max_value, high_V = max_value;
 
-    //Open the default video camera
+static void on_low_H_thresh_trackbar(int, void *)
+{
+    low_H = std::min(high_H-1, low_H);
+    cv::setTrackbarPos("Low H", window_detection_name, low_H);
+}
+static void on_high_H_thresh_trackbar(int, void *)
+{
+    high_H = std::max(high_H, low_H+1);
+    cv::setTrackbarPos("High H", window_detection_name, high_H);
+}
+static void on_low_S_thresh_trackbar(int, void *)
+{
+    low_S = std::min(high_S-1, low_S);
+    cv::setTrackbarPos("Low S", window_detection_name, low_S);
+}
+static void on_high_S_thresh_trackbar(int, void *)
+{
+    high_S = std::max(high_S, low_S+1);
+    cv::setTrackbarPos("High S", window_detection_name, high_S);
+}
+static void on_low_V_thresh_trackbar(int, void *)
+{
+    low_V = std::min(high_V-1, low_V);
+    cv::setTrackbarPos("Low V", window_detection_name, low_V);
+}
+static void on_high_V_thresh_trackbar(int, void *)
+{
+    high_V = std::max(high_V, low_V+1);
+    cv::setTrackbarPos("High V", window_detection_name, high_V);
+}
+int main()
+{
     cv::VideoCapture cap(0);
+    if(cap.isOpened()) CV_Assert("Cam opened failed");
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, 640);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT,480);
+    cv::namedWindow(window_capture_name);
+    cv::namedWindow(window_detection_name);
+    // Trackbars to set thresholds for HSV values
+    cv::createTrackbar("Low H", window_detection_name, &low_H, max_value_H, on_low_H_thresh_trackbar);
+    cv::createTrackbar("High H", window_detection_name, &high_H, max_value_H, on_high_H_thresh_trackbar);
+    cv::createTrackbar("Low S", window_detection_name, &low_S, max_value, on_low_S_thresh_trackbar);
+    cv::createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar);
+    cv::createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
+    cv::createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
 
-    // if not success, exit program
-    if (cap.isOpened() == false)  
-    {
-        std::cout << "Cannot open the video camera" << std::endl;
-        std::cin.get(); //wait for any key press
-        return -1;
-    } 
+    cv::Mat frame, frame_HSV, frame_threshold, color_contour;
 
-    double dWidth = cap.get(cv::CAP_PROP_FRAME_WIDTH); //get the width of frames of the video
-    double dHeight = cap.get(cv::CAP_PROP_FRAME_HEIGHT); //get the height of frames of the video
-
-    std::cout << "Resolution of the video : " << dWidth << " x " << dHeight << std::endl;
-
-    // std::string window_name = "My Camera Feed";
-    // cv::namedWindow(window_name); //create a window called "My Camera Feed"
-    
-    cv::Mat frame, fgMask, bgMask;
-    cv::Ptr<cv::BackgroundSubtractor> pBackSub = cv::createBackgroundSubtractorMOG2(500, 32.0, false);
-
-     //cap.read(fgMask);
-    // pBackSub->apply(frame, fgMask);
-
-    while (true)
-    {
-        bool bSuccess = cap.read(frame); // read a new frame from video 
-
-        //Breaking the while loop if the frames cannot be captured
-        if (bSuccess == false) 
+    std::vector<std::vector<cv::Point>> contours;
+    while (true) {
+        cap >> frame;
+        if(frame.empty())
         {
-            std::cout << "Video camera is disconnected" << std::endl;
-            std::cin.get(); //Wait for any key press
             break;
         }
 
-        //show the frame in the created window
-        //imshow(window_name, frame);
+        ///SHARED_MEMORY push(frame);
 
-        if (cv::waitKey(10) == 's')
+        cv::medianBlur(frame,frame,15);
+        // Convert from BGR to HSV colorspace
+        cv::cvtColor(frame, frame_HSV, cv::COLOR_BGR2HSV);
+        // Detect the object based on HSV Range Values
+        cv::inRange(frame_HSV, cv::Scalar(low_H, low_S, low_V), cv::Scalar(high_H, high_S, high_V), frame_threshold);
+
+        cv::flip(frame,frame,1);
+        cv::flip(frame_threshold,frame_threshold,1);
+
+        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_OPEN,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
+        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
+        cv::findContours(frame_threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+        for(size_t i=0; i<contours.size();++i)
+            drawContours(frame,contours,i,cv::Scalar(255,255,255));
+        
+        std::vector<std::vector<cv::Point>> contours_poly(contours.size());
+        std::vector<std::pair<cv::Point2f,float>> circles(contours.size()); 
+        try
         {
-           pBackSub->apply(frame,frame,1);
+            for(size_t i = 0; i < contours.size(); ++i)
+            {
+                cv::approxPolyDP(contours[i],contours_poly[i],3,true);
+                cv::minEnclosingCircle(contours[i],circles[i].first,circles[i].second);
+            }
         }
-        //cv::absdiff(frame, fgMask, bgMask);
-        pBackSub->apply(frame, fgMask,0);
-        cv::imshow("Frame", frame);
-        cv::imshow("FG Mask", fgMask);
-        //cv::imshow("BG Mask", bgMask);
-
-        //wait for for 10 ms until any key is pressed.  
-        //If the 'Esc' key is pressed, break the while loop.
-        //If the any other key is pressed, continue the loop 
-        //If any key is not pressed withing 10 ms, continue the loop 
-        if (cv::waitKey(10) == 27)
+        catch(const cv::Exception& e)
         {
-            std::cout << "Esc key is pressed by user. Stoppig the video" << std::endl;
+            std::cout<<e.what();
+        }
+
+
+        if(circles.size() > 0 )
+        {
+            std::sort(circles.begin(), circles.end(),[](const auto &x, const auto &y){return y.second < x.second;});
+            //SHARED_MEMORY.PUSH(circles[0])
+
+            ///TEMP
+            cv::circle(frame, circles[0].first,circles[0].second,{255,0,0});
+            cv::circle(frame, circles[0].first,1,{0,0,255});
+            ///TEMP
+
+        }
+        ///TEMP
+        cv::imshow(window_capture_name, frame);
+        cv::imshow(window_detection_name, frame_threshold);
+        char key = (char) cv::waitKey(30);
+
+        if (key == 'q' || key == 27)
+        {
             break;
         }
+        ///TEMP
+
+        ///SHARED_MEMORY
+        /*
+
+            get(end_program);
+            if(end_program) break;
+        */
     }
-
+    cap.release();
     return 0;
-
 }
