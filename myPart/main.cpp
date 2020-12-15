@@ -3,24 +3,19 @@
 #include <math.h>
 #include <ctime>
 #include <cstdlib>
+#include <opencv2/core/types.hpp>
 
 #define INIT_LENGTH 50
 
 using namespace std;
 
-int orientation(const pair<int, int> &a, const pair<int, int> &b, const pair<int, int> &c)
+int orientation(const cv::Point &a, const cv::Point &b, const cv::Point &c)
 {
-    int value = int(((b.second - a.second) * (c.first - b.first)) - ((b.first - a.first) * (c.second - b.second)));
+    int value = int(((b.y - a.y) * (c.x - b.x)) - ((b.x - a.x) * (c.y - b.y)));
     return value == 0 ? 0 : value > 0 ? 1 : 2;
-    // if (value == 0)
-    //     return 0;
-    // else if (value > 0)
-    //     return 1;
-    // else
-    //     return 2;
 }
 
-bool ifIntersected(const pair<int, int> &a, const pair<int, int> &b, const pair<int, int> &c, const pair<int, int> &d)
+bool ifIntersected(const cv::Point &a, const cv::Point &b, const cv::Point &c, const cv::Point &d)
 {
     int checkOrient[4] = {};
     checkOrient[0] = orientation(a, b, c);
@@ -33,38 +28,32 @@ bool ifIntersected(const pair<int, int> &a, const pair<int, int> &b, const pair<
 class Snake
 {
 public:
-    //Snake();
-    // void addPoint(const int &x, const int &y)
-    // {
-    //     snakeBody.push_back(make_pair(x, y));
-    // }
-
-    vector<pair<int, int>> snakeBody;
+    vector<cv::Point> snakeBody;
     vector<int> sectionLength;
 
     int allowedLength = INIT_LENGTH;
     int length = 0;
 
-private:
+    void incAllowedLength()
+    {
+        allowedLength += 5;
+    }
 };
 
 class Fruit
 {
 public:
-    int xFruit, yFruit;
+    cv::Point fruitPoint;
 
-    void generatePoints()
+    void generatePoint()
     {
-        xFruit = rand() % 200;
-        yFruit = rand() % 200;
+        fruitPoint = cv::Point(rand() % 200, rand() % 200);
     }
 
-    bool checkIfEaten(pair<int, int> addedPoint)
+    bool checkIfEaten(const cv::Point &addedPoint)
     {
-        return addedPoint.first > xFruit && addedPoint.first < xFruit + 10 && addedPoint.second > yFruit && addedPoint.second < yFruit + 10 ? true : false;
+        return addedPoint.x > fruitPoint.x && addedPoint.x < fruitPoint.x + 10 && addedPoint.y > fruitPoint.y && addedPoint.y < fruitPoint.y + 10 ? true : false;
     }
-
-private:
 };
 
 main(int argc, char *argv[])
@@ -72,86 +61,84 @@ main(int argc, char *argv[])
     srand((unsigned)time(0));
 
     Snake gameSnake;
-    gameSnake.snakeBody.push_back(make_pair(5, 2));
+    gameSnake.snakeBody.push_back(cv::Point(5, 2));
 
-    //Read data from Tisku in format int x, y
-    //or as a pair
+    Fruit gameFruit;
+    gameFruit.generatePoint();
+
+    //Read data from Tisku in format int x, y or as cv::Point
 
     //example: two variables
     int x, y;
-    vector<pair<int, int>> testowy;
+    vector<cv::Point> testowy;
 
-    testowy.push_back(make_pair(5, 5));
-    testowy.push_back(make_pair(5, 10));
-    testowy.push_back(make_pair(3, 7));
-    testowy.push_back(make_pair(10, 7));
-    testowy.push_back(make_pair(12, 8));
-    testowy.push_back(make_pair(10, 10));
-    testowy.push_back(make_pair(7, 12));
-    testowy.push_back(make_pair(5, 11));
+    testowy.push_back(cv::Point(5, 5));
+    testowy.push_back(cv::Point(5, 10));
+    testowy.push_back(cv::Point(3, 7));
+    testowy.push_back(cv::Point(10, 7));
+    testowy.push_back(cv::Point(12, 8));
+    testowy.push_back(cv::Point(10, 10));
+    testowy.push_back(cv::Point(7, 12));
+    testowy.push_back(cv::Point(5, 11));
 
     for (int j = 0; j < testowy.size(); ++j)
     {
+        x = testowy[j].x;
+        y = testowy[j].y;
 
-        // while (1)
-        // {
-
-        x = testowy[j].first;
-        y = testowy[j].second;
-
-        cout << "X: " << x << " and Y: " << y << endl;
-
-        int distance = int(sqrt(pow(gameSnake.snakeBody.back().first - x, 2) + pow(gameSnake.snakeBody.back().second - y, 2)));
-        cout << "Distance is equal: " << distance << endl;
-
-        if (x != 0 && y != 0) //&& distance > 5)
+        if (gameSnake.snakeBody.size() < 1)
         {
-            gameSnake.snakeBody.push_back(make_pair(x, y));
-            gameSnake.sectionLength.push_back(distance);
-            gameSnake.length += distance;
-            cout << "Lenght of snake: " << gameSnake.length << endl;
+            gameSnake.snakeBody.push_back(cv::Point(x, y));
         }
-
-        while (gameSnake.length > gameSnake.allowedLength)
+        else
         {
-            gameSnake.length -= gameSnake.sectionLength.front();
-            gameSnake.sectionLength.erase(gameSnake.sectionLength.begin());
-            gameSnake.snakeBody.erase(gameSnake.snakeBody.begin());
-        }
 
-        //TODO check if he eats fruit
-        if (gameSnake.snakeBody.size() > 3)
-        {
-            cout << "Check if intersected " << endl;
-            bool isDead = false;
+            int distance = int(sqrt(pow(gameSnake.snakeBody.back().x - x, 2) + pow(gameSnake.snakeBody.back().y - y, 2)));
 
-            pair<int, int> pointA, pointB, pointC, pointD;
-            int snakeSize = gameSnake.snakeBody.size();
-
-            pointA = gameSnake.snakeBody[snakeSize - 1];
-            pointB = gameSnake.snakeBody[snakeSize - 2];
-
-            for (int i = 0; i < snakeSize - 3; ++i)
+            if (x != 0 && y != 0) //&& distance > 5) //uncomment later
             {
-                pointC = gameSnake.snakeBody[i];
-                pointD = gameSnake.snakeBody[i + 1];
-
-                cout << "Points: "
-                     << pointA.first << " " << pointA.second << endl
-                     << pointB.first << " " << pointB.second << endl
-                     << pointC.first << " " << pointC.second << endl
-                     << pointD.first << " " << pointD.second << endl
-                     << endl;
-
-                if (ifIntersected(pointA, pointB, pointC, pointD) && pointD != pointB)
-                {
-                    isDead = true;
-                    break;
-                }
+                gameSnake.snakeBody.push_back(cv::Point(x, y));
+                gameSnake.sectionLength.push_back(distance);
+                gameSnake.length += distance;
             }
-            if (isDead)
-                break;
+
+            while (gameSnake.length > gameSnake.allowedLength)
+            {
+                gameSnake.length -= gameSnake.sectionLength.front();
+                gameSnake.sectionLength.erase(gameSnake.sectionLength.begin());
+                gameSnake.snakeBody.erase(gameSnake.snakeBody.begin());
+            }
+
+            if (gameSnake.snakeBody.size() > 3)
+            {
+                bool isDead = false;
+
+                cv::Point pointA, pointB, pointC, pointD;
+                int snakeSize = gameSnake.snakeBody.size();
+
+                pointA = gameSnake.snakeBody[snakeSize - 1];
+                pointB = gameSnake.snakeBody[snakeSize - 2];
+
+                for (int i = 0; i < snakeSize - 3; ++i)
+                {
+                    pointC = gameSnake.snakeBody[i];
+                    pointD = gameSnake.snakeBody[i + 1];
+
+                    if (ifIntersected(pointA, pointB, pointC, pointD) && pointD != pointB)
+                    {
+                        isDead = true;
+                        break;
+                    }
+                }
+                if (isDead)
+                    break;
+            }
         }
-        // }
+
+        if (gameFruit.checkIfEaten(gameSnake.snakeBody.back()))
+        {
+            gameSnake.incAllowedLength();
+            gameFruit.generatePoint();
+        }
     }
 }
