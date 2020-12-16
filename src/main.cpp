@@ -1,80 +1,152 @@
-#include "opencv2/imgproc.hpp"
-#include "opencv2/highgui.hpp"
-#include "opencv2/videoio.hpp"
+#include <opencv2/imgproc.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/videoio.hpp>
 #include <iostream>
-using namespace cv;
-const int max_value_H = 360/2;
+#include "Snake.hpp"
+
+#define INIT_LENGTH 5000;
+
+///SHARED
+bool is_paused = false;
+bool configure_options = false;
+int GAME_SIZE_X = 640;
+int GAME_SIZE_Y = 480;
+///SHARED
+
+
+const int max_value_H = 180;
 const int max_value = 255;
-const String window_capture_name = "Video Capture";
-const String window_detection_name = "Object Detection";
-int low_H = 0, low_S = 0, low_V = 0;
+const std::string window_game_name = "Snake Game";
+const std::string window_detection_name = "Object Detection";
+int low_H = 160, low_S = 100, low_V = 100;
 int high_H = max_value_H, high_S = max_value, high_V = max_value;
+
 static void on_low_H_thresh_trackbar(int, void *)
 {
-    low_H = min(high_H-1, low_H);
-    setTrackbarPos("Low H", window_detection_name, low_H);
+    low_H = std::min(high_H-1, low_H);
+    cv::setTrackbarPos("Low H", window_detection_name, low_H);
 }
 static void on_high_H_thresh_trackbar(int, void *)
 {
-    high_H = max(high_H, low_H+1);
-    setTrackbarPos("High H", window_detection_name, high_H);
+    high_H = std::max(high_H, low_H+1);
+    cv::setTrackbarPos("High H", window_detection_name, high_H);
 }
 static void on_low_S_thresh_trackbar(int, void *)
 {
-    low_S = min(high_S-1, low_S);
-    setTrackbarPos("Low S", window_detection_name, low_S);
+    low_S = std::min(high_S-1, low_S);
+    cv::setTrackbarPos("Low S", window_detection_name, low_S);
 }
 static void on_high_S_thresh_trackbar(int, void *)
 {
-    high_S = max(high_S, low_S+1);
-    setTrackbarPos("High S", window_detection_name, high_S);
+    high_S = std::max(high_S, low_S+1);
+    cv::setTrackbarPos("High S", window_detection_name, high_S);
 }
 static void on_low_V_thresh_trackbar(int, void *)
 {
-    low_V = min(high_V-1, low_V);
-    setTrackbarPos("Low V", window_detection_name, low_V);
+    low_V = std::min(high_V-1, low_V);
+    cv::setTrackbarPos("Low V", window_detection_name, low_V);
 }
 static void on_high_V_thresh_trackbar(int, void *)
 {
-    high_V = max(high_V, low_V+1);
-    setTrackbarPos("High V", window_detection_name, high_V);
+    high_V = std::max(high_V, low_V+1);
+    cv::setTrackbarPos("High V", window_detection_name, high_V);
 }
-int main(int argc, char* argv[])
+int main()
 {
-    VideoCapture cap(argc > 1 ? atoi(argv[1]) : 0);
-    namedWindow(window_capture_name);
-    namedWindow(window_detection_name);
-    // Trackbars to set thresholds for HSV values
-    createTrackbar("Low H", window_detection_name, &low_H, max_value_H, on_low_H_thresh_trackbar);
-    createTrackbar("High H", window_detection_name, &high_H, max_value_H, on_high_H_thresh_trackbar);
-    createTrackbar("Low S", window_detection_name, &low_S, max_value, on_low_S_thresh_trackbar);
-    createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar);
-    createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
-    createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
-    Mat frame, frame_HSV, frame_threshold;
+    srand((unsigned)time(0));
+    Snake snake;
+
+    cv::VideoCapture cap(0);
+    if(cap.isOpened()) CV_Assert("Cam opened failed");
+    cap.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
+    cap.set(cv::CAP_PROP_FRAME_HEIGHT,GAME_SIZE_Y);
+    cv::namedWindow(window_game_name);
+    
+
+    cv::Mat game_frame, frame, frame_HSV, frame_threshold, color_contour;
+
+    std::vector<std::vector<cv::Point>> contours;
     while (true) {
-        cap >> frame;
-        if(frame.empty())
+        while(!is_paused || configure_options)
         {
-            break;
-        }
-        blur(frame,frame,Size(5,5));
-        // Convert from BGR to HSV colorspace
-        cvtColor(frame, frame_HSV, COLOR_BGR2HSV);
-        // Detect the object based on HSV Range Values
-        inRange(frame_HSV, Scalar(low_H, low_S, low_V), Scalar(high_H, high_S, high_V), frame_threshold);
-        // Show the frames
-        flip(frame,frame,1);
-        flip(frame_threshold,frame_threshold,1);
-        cv::erode(frame_threshold, frame_threshold,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5,5))); 
-        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(5,5)));
-        imshow(window_capture_name, frame);
-        imshow(window_detection_name, frame_threshold);
-        char key = (char) waitKey(30);
-        if (key == 'q' || key == 27)
-        {
-            break;
+
+            cap >> frame;
+            if(frame.empty())
+            {
+                break;
+            }
+
+            cv::flip(frame,frame,1);
+            frame.copyTo(game_frame);
+            ///SHARED_MEMORY push(frame);
+
+            cv::medianBlur(frame,frame,15);
+            // Convert from BGR to HSV colorspace
+            cv::cvtColor(frame, frame_HSV, cv::COLOR_BGR2HSV);
+            // Detect the object based on HSV Range Values
+            cv::inRange(frame_HSV, cv::Scalar(low_H, low_S, low_V), cv::Scalar(high_H, high_S, high_V), frame_threshold);
+
+            cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_OPEN,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
+            cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
+            cv::findContours(frame_threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+            
+            std::vector<std::vector<cv::Point>> contours_poly(contours.size());
+            std::vector<std::pair<cv::Point2f,float>> circles(contours.size()); 
+            try
+            {
+                for(size_t i = 0; i < contours.size(); ++i)
+                {
+                    cv::approxPolyDP(contours[i],contours_poly[i],3,true);
+                    cv::minEnclosingCircle(contours[i],circles[i].first,circles[i].second);
+                }
+            }
+            catch(const cv::Exception& e)
+            {
+                std::cout<<e.what();
+            }
+
+
+            if(circles.size() > 0 )
+            {
+                std::sort(circles.begin(), circles.end(),[](const auto &x, const auto &y){return y.second < x.second;});
+
+                cv::circle(game_frame, circles[0].first,circles[0].second,{255,0,0});
+                cv::circle(game_frame, circles[0].first,1,{0,0,255});
+                snake.addToSnake(circles[0].first);
+            }
+            //stop_game = snake.isDead()
+            snake.draw(game_frame);
+            cv::imshow(window_game_name,game_frame);
+
+            if(configure_options)
+            {
+                cv::createTrackbar("Low H", window_detection_name, &low_H, max_value_H, on_low_H_thresh_trackbar);
+                cv::createTrackbar("High H", window_detection_name, &high_H, max_value_H, on_high_H_thresh_trackbar);
+                cv::createTrackbar("Low S", window_detection_name, &low_S, max_value, on_low_S_thresh_trackbar);
+                cv::createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar);
+                cv::createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
+                cv::createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
+                cv::imshow(window_detection_name, frame_threshold);
+            }
+
+            
+            char key = (char) cv::waitKey(30);
+            if (key == 'q' || key == 27)
+            {
+                cap.release();
+                return 0;
+            }
+            if(key == 'o') 
+            {
+                configure_options = !configure_options;
+                is_paused = !is_paused;
+                if(cv::getWindowProperty(window_detection_name,cv::WINDOW_AUTOSIZE) != -1)
+                    cv::destroyWindow(window_detection_name);
+            }
         }
     }
+    cap.release();
     return 0;
 }
+
