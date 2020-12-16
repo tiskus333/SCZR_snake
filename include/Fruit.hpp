@@ -4,7 +4,7 @@ class Fruit
 {
 public:
     cv::Point fruitPoint;
-    int fruitRadius = 10;
+    int fruitRadius = 20;
 
     void generatePoint()
     {
