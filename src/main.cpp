@@ -9,6 +9,7 @@
 ///SHARED
 bool is_paused = false;
 bool configure_options = false;
+bool end_game = false;
 int GAME_SIZE_X = 640;
 int GAME_SIZE_Y = 480;
 ///SHARED
@@ -67,83 +68,81 @@ int main()
 
     std::vector<std::vector<cv::Point>> contours;
     while (true) {
-        while(!is_paused || configure_options)
+        cap >> frame;
+        if(frame.empty())
         {
+            break;
+        }
 
-            cap >> frame;
-            if(frame.empty())
+        cv::flip(frame,frame,1);
+        frame.copyTo(game_frame);
+        ///SHARED_MEMORY push(frame);
+
+        cv::medianBlur(frame,frame,15);
+        // Convert from BGR to HSV colorspace
+        cv::cvtColor(frame, frame_HSV, cv::COLOR_BGR2HSV);
+        // Detect the object based on HSV Range Values
+        cv::inRange(frame_HSV, cv::Scalar(low_H, low_S, low_V), cv::Scalar(high_H, high_S, high_V), frame_threshold);
+
+        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_OPEN,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
+        cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
+        cv::findContours(frame_threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
+
+        
+        std::vector<std::vector<cv::Point>> contours_poly(contours.size());
+        std::vector<std::pair<cv::Point2f,float>> circles(contours.size()); 
+        try
+        {
+            for(size_t i = 0; i < contours.size(); ++i)
             {
-                break;
+                cv::approxPolyDP(contours[i],contours_poly[i],3,true);
+                cv::minEnclosingCircle(contours[i],circles[i].first,circles[i].second);
             }
-
-            cv::flip(frame,frame,1);
-            frame.copyTo(game_frame);
-            ///SHARED_MEMORY push(frame);
-
-            cv::medianBlur(frame,frame,15);
-            // Convert from BGR to HSV colorspace
-            cv::cvtColor(frame, frame_HSV, cv::COLOR_BGR2HSV);
-            // Detect the object based on HSV Range Values
-            cv::inRange(frame_HSV, cv::Scalar(low_H, low_S, low_V), cv::Scalar(high_H, high_S, high_V), frame_threshold);
-
-            cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_OPEN,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
-            cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
-            cv::findContours(frame_threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-
-            
-            std::vector<std::vector<cv::Point>> contours_poly(contours.size());
-            std::vector<std::pair<cv::Point2f,float>> circles(contours.size()); 
-            try
-            {
-                for(size_t i = 0; i < contours.size(); ++i)
-                {
-                    cv::approxPolyDP(contours[i],contours_poly[i],3,true);
-                    cv::minEnclosingCircle(contours[i],circles[i].first,circles[i].second);
-                }
-            }
-            catch(const cv::Exception& e)
-            {
-                std::cout<<e.what();
-            }
+        }
+        catch(const cv::Exception& e)
+        {
+            std::cout<<e.what();
+        }
 
 
-            if(circles.size() > 0 )
-            {
-                std::sort(circles.begin(), circles.end(),[](const auto &x, const auto &y){return y.second < x.second;});
+        if(circles.size() > 0 )
+        {
+            std::sort(circles.begin(), circles.end(),[](const auto &x, const auto &y){return y.second < x.second;});
 
-                cv::circle(game_frame, circles[0].first,circles[0].second,{255,0,0});
-                cv::circle(game_frame, circles[0].first,1,{0,0,255});
-                snake.addToSnake(circles[0].first);
-            }
-            //stop_game = snake.isDead()
-            snake.draw(game_frame);
-            cv::imshow(window_game_name,game_frame);
+            cv::circle(game_frame, circles[0].first,circles[0].second,{255,0,0});
+            cv::circle(game_frame, circles[0].first,1,{0,0,255});
+            if(!is_paused)
+            end_game = snake.calculateSnake(circles[0].first);
+        }
+        snake.draw(game_frame);
+        cv::imshow(window_game_name,game_frame);
 
-            if(configure_options)
-            {
-                cv::createTrackbar("Low H", window_detection_name, &low_H, max_value_H, on_low_H_thresh_trackbar);
-                cv::createTrackbar("High H", window_detection_name, &high_H, max_value_H, on_high_H_thresh_trackbar);
-                cv::createTrackbar("Low S", window_detection_name, &low_S, max_value, on_low_S_thresh_trackbar);
-                cv::createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar);
-                cv::createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
-                cv::createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
-                cv::imshow(window_detection_name, frame_threshold);
-            }
+        if(configure_options)
+        {
+            cv::createTrackbar("Low H", window_detection_name, &low_H, max_value_H, on_low_H_thresh_trackbar);
+            cv::createTrackbar("High H", window_detection_name, &high_H, max_value_H, on_high_H_thresh_trackbar);
+            cv::createTrackbar("Low S", window_detection_name, &low_S, max_value, on_low_S_thresh_trackbar);
+            cv::createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar);
+            cv::createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar);
+            cv::createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
+            cv::imshow(window_detection_name, frame_threshold);
+        }
+        if(end_game)
+        std::cout<<"GAME OVER!"<<std::endl;
 
-            
-            char key = (char) cv::waitKey(30);
-            if (key == 'q' || key == 27)
-            {
-                cap.release();
-                return 0;
-            }
-            if(key == 'o') 
-            {
-                configure_options = !configure_options;
-                is_paused = !is_paused;
-                if(cv::getWindowProperty(window_detection_name,cv::WINDOW_AUTOSIZE) != -1)
-                    cv::destroyWindow(window_detection_name);
-            }
+        
+        char key = (char) cv::waitKey(30);
+        if (key == 'q' || key == 27)
+        {
+            cap.release();
+            return 0;
+        }
+        if(key == 'o') 
+        {
+            configure_options = !configure_options;
+            is_paused = !is_paused;
+            if(cv::getWindowProperty(window_detection_name,cv::WINDOW_AUTOSIZE) != -1)
+                cv::destroyWindow(window_detection_name);
         }
     }
     cap.release();

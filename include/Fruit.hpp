@@ -8,7 +8,7 @@ public:
 
     void generatePoint()
     {
-        fruitPoint = cv::Point(rand() % 200, rand() % 200);
+        fruitPoint = cv::Point(rand() % 590 + 25, rand() % 430 + 25);
     }
 
     bool checkIfEat(const cv::Point &addedPoint)

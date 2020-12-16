@@ -86,4 +86,54 @@ Snake()
         }
         cv::circle(frame, snakeFruit.fruitPoint, snakeFruit.fruitRadius, {0,255,0}, cv::FILLED);
     }
+    
+    bool calculateSnake(const cv::Point &point)
+    {
+        if (snakeBody.size() < 1)
+        {
+            addToSnake(point);
+        }
+        else
+        {
+            int distance = int(sqrt(pow(snakeBody.back().x - point.x, 2) + pow(snakeBody.back().y - point.y, 2)));
+
+            if (point.x != 0 && point.y != 0) //&& distance > 5) //uncomment later
+            {
+                addToSnake(point);
+                addValueToLength(distance);
+            }
+
+            while (length > allowedLength)
+            {
+                deletePointFromBegin();
+            }
+
+            if (snakeBody.size() > 3)
+            {
+                cv::Point pointA, pointB, pointC, pointD;
+                int snakeSize = snakeBody.size();
+
+                pointA = getPoint(snakeSize - 1);
+                pointB = getPoint(snakeSize - 2);
+
+                for (int i = 0; i < snakeSize - 3; ++i)
+                {
+                    pointC = getPoint(i);
+                    pointD = getPoint(i + 1);
+
+                    if (ifIntersected(pointA, pointB, pointC, pointD) && pointD != pointB)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (checkIfEaten())
+            {
+                incAllowedLength();
+                snakeFruit.generatePoint();
+            }
+        }
+        return false;
+    }
 };
