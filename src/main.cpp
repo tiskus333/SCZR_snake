@@ -19,8 +19,8 @@ const int max_value_H = 180;
 const int max_value = 255;
 const std::string window_game_name = "Snake Game";
 const std::string window_detection_name = "Object Detection";
-int low_H = 160, low_S = 100, low_V = 100;
-int high_H = max_value_H, high_S = max_value, high_V = max_value;
+int low_H = 32, low_S = 100, low_V = 0;
+int high_H = 100, high_S = max_value, high_V = max_value;
 
 static void on_low_H_thresh_trackbar(int, void *)
 {
@@ -55,7 +55,7 @@ static void on_high_V_thresh_trackbar(int, void *)
 int main()
 {
     srand((unsigned)time(0));
-    Snake snake;
+    Snake snake({GAME_SIZE_X,GAME_SIZE_Y});
 
     cv::VideoCapture cap(0);
     if(cap.isOpened()) CV_Assert("Cam opened failed");
