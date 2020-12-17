@@ -128,6 +128,7 @@ Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
 
                     if (ifIntersected(pointA, pointB, pointC, pointD) && pointD != pointB)
                     {
+                        score = 0;
                         return true;
                     }
                 }

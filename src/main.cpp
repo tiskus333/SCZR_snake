@@ -4,8 +4,6 @@
 #include <iostream>
 #include "Snake.hpp"
 
-#define INIT_LENGTH 5000;
-
 ///SHARED
 bool is_paused = false;
 bool configure_options = false;
@@ -67,16 +65,28 @@ int main()
     cv::Mat game_frame, frame, frame_HSV, frame_threshold, color_contour;
 
     std::vector<std::vector<cv::Point>> contours;
-    while (true) {
+
+    
+
+    
+
+    do {
         cap >> frame;
         if(frame.empty())
         {
             break;
-        }
+        }//save to shm
 
         cv::flip(frame,frame,1);
         frame.copyTo(game_frame);
-        ///SHARED_MEMORY push(frame);
+
+        // if(end_game)
+        // {
+        //     cv::putText(game_frame,"Press SPACE",{GAME_SIZE_X/2,GAME_SIZE_Y/2},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{255,0,0},2);
+        //     cv::imshow(window_game_name,game_frame);
+        //     do{}
+        //     while(cv::waitKey(0) != ' ');
+        // }
 
         cv::medianBlur(frame,frame,15);
         // Convert from BGR to HSV colorspace
@@ -115,6 +125,9 @@ int main()
             end_game = snake.calculateSnake(circles[0].first);
         }
         snake.draw(game_frame);
+
+        //std::cout<<sizeof(game_frame.elemSize() * game_frame.size().area());
+        // get frame from smh
         cv::imshow(window_game_name,game_frame);
 
         if(configure_options)
@@ -144,7 +157,7 @@ int main()
             if(cv::getWindowProperty(window_detection_name,cv::WINDOW_AUTOSIZE) != -1)
                 cv::destroyWindow(window_detection_name);
         }
-    }
+    }while (!end_game);
     cap.release();
     return 0;
 }
