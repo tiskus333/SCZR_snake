@@ -6,7 +6,7 @@ SRC		:= src
 INCLUDE	:= include
 OPENCV	:= `pkg-config opencv4 --cflags --libs`
 
-LIBRARIES	:= $(OPENCV)
+LIBRARIES	:= $(OPENCV) -pthread -lrt
 EXECUTABLE	:= snake.o
 
 
