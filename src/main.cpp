@@ -2,15 +2,15 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/videoio.hpp>
 #include <iostream>
+#include <string.h>
 #include "Snake.hpp"
+#include "SharedMemory.h"
 
-///SHARED
 bool is_paused = false;
 bool configure_options = false;
 bool end_game = false;
 int GAME_SIZE_X = 640;
 int GAME_SIZE_Y = 480;
-///SHARED
 
 
 const int max_value_H = 180;
@@ -162,3 +162,128 @@ int main()
     return 0;
 }
 
+
+
+
+const char *SHARED_MEMORY_PATH = "/frame_buffer";
+
+void initProcess(void (*fun)())
+{
+    if (fork() == 0)
+    {
+        fun();
+        exit(EXIT_SUCCESS);
+    }
+}
+
+// odczyt kamery: klatka -> pamiec wspoldzielona
+void CameraRead()
+{
+    sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        // close write semaphore
+        if (sem_wait(&shmp->sem_write))
+        {
+            perror("A: sem_wait error.");
+            exit(EXIT_FAILURE);
+        }
+
+        // writing data into shared memory
+        std::string str = "A frame #" + std::to_string(i);
+        std::cout << "A: Writing data: " << str << std::endl;
+        const char *chr = str.c_str();
+        memcpy(&shmp->frame, chr, strlen(chr));
+
+        // open read semaphore
+        if (sem_post(&shmp->sem_read))
+        {
+            perror("A: sem_post error.");
+            exit(EXIT_FAILURE);
+        }
+
+        // data processing
+        sleep(1); // simulates data processing
+    }
+
+    // clear after process is finished
+    shm_unlink(SHARED_MEMORY_PATH);
+}
+
+void GameCalculate()
+{
+    sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        // close read semaphore
+        if (sem_wait(&shmp->sem_read))
+        {
+            perror("B: sem_wait error.");
+            exit(EXIT_FAILURE);
+        }
+
+        // reading data from shared memory
+        printf("B: Reading data: %s\n", &shmp->frame);
+
+        // open write semaphore
+        if (sem_post(&shmp->sem_write))
+        {
+            perror("B: sem_post error.");
+            exit(EXIT_FAILURE);
+        }
+
+        // data processing
+        sleep(1); // simulates data processing
+    }
+
+    // clear after process is finished
+    shm_unlink(SHARED_MEMORY_PATH);
+}
+void GameDraw()
+{
+    sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
+
+    for (int i = 0; i < 10; ++i)
+    {
+        // close read semaphore
+        if (sem_wait(&shmp->sem_read))
+        {
+            perror("B: sem_wait error.");
+            exit(EXIT_FAILURE);
+        }
+
+        // reading data from shared memory
+        printf("B: Reading data: %s\n", &shmp->frame);
+
+        // open write semaphore
+        if (sem_post(&shmp->sem_write))
+        {
+            perror("B: sem_post error.");
+            exit(EXIT_FAILURE);
+        }
+
+        // data processing
+        sleep(1); // simulates data processing
+    }
+
+    // clear after process is finished
+    shm_unlink(SHARED_MEMORY_PATH);
+}
+
+
+int main()
+{
+    // unlink from shared memory object if still exists
+    shm_unlink(SHARED_MEMORY_PATH);
+
+    createSharedMemory(SHARED_MEMORY_PATH);
+
+    initProcess(processA);
+    initProcess(processB);
+    sleep(10);
+    // unlink from shared memory object
+    shm_unlink(SHARED_MEMORY_PATH);
+    exit(EXIT_SUCCESS);
+}
