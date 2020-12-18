@@ -107,19 +107,6 @@ bool Snake::calculateSnake(const cv::Point &point) {
   return false;
 }
 bool Snake::ifCutCircle() {
-  /* int snakeSize = snakeBody.size();
-  cv::Point a = getPoint(snakeSize - 1), b = getPoint(snakeSize - 2);
-  int area2 = abs((b.x - a.x) * (snakeFruit.fruitPoint.y - a.y) -
-  (snakeFruit.fruitPoint.x - a.x) * (b.y - a.y)); int distance =
-  int(sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2))); int height = area2 /
-  distance; if (height < snakeFruit.fruitRadius)
-  {
-      return true;
-  }
-  else
-  {
-      return false;
-  } */
   int dist = sectionLength.back() / snakeFruit.fruitRadius + 1;
   int diffX =
       (getPoint(snakeBody.size() - 1).x - getPoint(snakeBody.size() - 2).x) /
