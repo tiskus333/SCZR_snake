@@ -18,6 +18,7 @@ public:
     const int ADD_LENGTH = 5;
     int length = 0;
     int score = 0;
+    int lives = 3;
     cv::Point ScreenSize;
 
     Snake(const cv::Point &screenSize);

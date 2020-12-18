@@ -73,6 +73,8 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
         }
         cv::circle(frame, snakeFruit.fruitPoint, snakeFruit.fruitRadius, {0,255,0}, cv::FILLED);
         cv::putText(frame,"SCORE: "+std::to_string(score),{ScreenSize.x - 200, 30},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{255,0,0},2);
+        cv::putText(frame,"LIVES: "+std::to_string(lives),{20, 30},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{255,0,0},2);
+
     }
     
     bool Snake::calculateSnake(const cv::Point &point)
@@ -112,7 +114,7 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
                     if (ifIntersected(pointA, pointB, pointC, pointD) && pointD != pointB)
                     {
                         score = 0;
-                        return true;
+                        return  --lives == 0;
                     }
                 }
             }
