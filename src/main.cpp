@@ -7,6 +7,7 @@
 #include "SharedMemory.hpp"
 
 bool is_paused = false;
+bool repeat_game = false;
 bool configure_options = false;
 bool end_game = false;
 int GAME_SIZE_X = 640;
@@ -53,40 +54,34 @@ static void on_high_V_thresh_trackbar(int, void *)
 int main()
 {
     srand((unsigned)time(0));
-    Snake snake({GAME_SIZE_X,GAME_SIZE_Y});
 
     cv::VideoCapture cap(0);
     if(cap.isOpened()) CV_Assert("Cam opened failed");
     cap.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
     cap.set(cv::CAP_PROP_FRAME_HEIGHT,GAME_SIZE_Y);
     cv::namedWindow(window_game_name);
+    char key;
     
 
     cv::Mat game_frame, frame, frame_HSV, frame_threshold, color_contour;
 
     std::vector<std::vector<cv::Point>> contours;
 
+ do{ 
+    Snake snake({GAME_SIZE_X,GAME_SIZE_Y});
+    do{
+        cap>>frame;
+        cv::flip(frame,frame,1);
+        cv::putText(frame,"Press SPACE to begin",{GAME_SIZE_X/2-150, GAME_SIZE_Y/2-20},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{0,0,255},2);
+        cv::imshow(window_game_name,frame);
+        key = cv::waitKey(1);
+        if(key == 27) return 0;
+    }while(key != ' ');
     
-
-    
-
     do {
         cap >> frame;
-        if(frame.empty())
-        {
-            break;
-        }//save to shm
-
         cv::flip(frame,frame,1);
         frame.copyTo(game_frame);
-
-        // if(end_game)
-        // {
-        //     cv::putText(game_frame,"Press SPACE",{GAME_SIZE_X/2,GAME_SIZE_Y/2},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{255,0,0},2);
-        //     cv::imshow(window_game_name,game_frame);
-        //     do{}
-        //     while(cv::waitKey(0) != ' ');
-        // }
 
         cv::medianBlur(frame,frame,15);
         // Convert from BGR to HSV colorspace
@@ -140,12 +135,11 @@ int main()
             cv::createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar);
             cv::imshow(window_detection_name, frame_threshold);
         }
-        if(end_game)
-        std::cout<<"GAME OVER!"<<std::endl;
+
 
         
-        char key = (char) cv::waitKey(30);
-        if (key == 'q' || key == 27)
+         key =  cv::waitKey(1);
+        if (key == 27)
         {
             cap.release();
             return 0;
@@ -158,6 +152,19 @@ int main()
                 cv::destroyWindow(window_detection_name);
         }
     }while (!end_game);
+
+    do{
+        cap>>frame;
+        cv::flip(frame,frame,1);
+        cv::putText(frame,"GAME OVER!",{GAME_SIZE_X/2-75, GAME_SIZE_Y/2 - 50},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{0,0,255},2);
+        cv::putText(frame,"Press SPACE to reset",{GAME_SIZE_X/2-150, GAME_SIZE_Y/2-20},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{0,0,255},2);
+        cv::imshow(window_game_name,frame);
+        key = cv::waitKey(1);
+        if(key == ' ') repeat_game = true;
+        if(key == 27) return 0;
+    }while(key != ' ');
+
+} while(repeat_game);
     cap.release();
     return 0;
 }

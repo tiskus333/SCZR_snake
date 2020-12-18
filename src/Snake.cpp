@@ -9,12 +9,7 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
     {
         allowedLength += ADD_LENGTH;
     }
-    void Snake::reset()
-    {
-        lives = 3;
-        score = 0;
-        snakeFruit.generatePoint(ScreenSize);
-    }
+
     bool Snake::ifIntersected(const cv::Point &a, const cv::Point &b, const cv::Point &c, const cv::Point &d)
     {
         int checkOrient[4] = {};
@@ -66,7 +61,7 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
 
     bool Snake::checkIfEaten()
     {
-        return snakeFruit.checkIfEat(/* *(snakeBody.end()-2), */ *(snakeBody.end()-1));
+        return snakeFruit.checkIfEat(snakeBody.back()) /* || ifCutCircle() */;
     }
 
     void Snake::draw(cv::Mat &frame)
@@ -91,7 +86,7 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
         {
             int distance = int(sqrt(pow(snakeBody.back().x - point.x, 2) + pow(snakeBody.back().y - point.y, 2)));
 
-            if (point.x != 0 && point.y != 0) //&& distance > 5) //uncomment later
+            if (point.x != 0 && point.y != 0 && distance > 1) //uncomment later
             {
                 addToSnake(point);
                 addValueToLength(distance);
@@ -117,7 +112,6 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
 
                     if (ifIntersected(pointA, pointB, pointC, pointD) && pointD != pointB)
                     {
-                        score = 0;
                         return --lives == 0;
                     }
                 }
@@ -132,3 +126,19 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
         }
         return false;
     }
+bool Snake::ifCutCircle()
+{
+    int snakeSize = snakeBody.size();
+    cv::Point a = getPoint(snakeSize - 1), b = getPoint(snakeSize - 2);
+    int area2 = abs((b.x - a.x) * (snakeFruit.fruitPoint.y - a.y) - (snakeFruit.fruitPoint.x - a.x) * (b.y - a.y));
+    int distance = int(sqrt(pow(b.x - a.x, 2) + pow(b.y - a.y, 2)));
+    int height = area2 / distance;
+    if (height < snakeFruit.fruitRadius)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}

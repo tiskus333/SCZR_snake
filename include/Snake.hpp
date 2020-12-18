@@ -22,7 +22,6 @@ public:
     cv::Point ScreenSize;
 
     Snake(const cv::Point &screenSize);
-    void reset();
     void incAllowedLength();
     bool ifIntersected(const cv::Point &a, const cv::Point &b, const cv::Point &c, const cv::Point &d);
     int orientation(const cv::Point &a, const cv::Point &b, const cv::Point &c);
@@ -35,4 +34,5 @@ public:
     bool checkIfEaten();
     void draw(cv::Mat &frame);
     bool calculateSnake(const cv::Point &point);
+    bool ifCutCircle();
 };
