@@ -18,9 +18,11 @@ public:
     const int ADD_LENGTH = 5;
     int length = 0;
     int score = 0;
+     int lives = 3;
     cv::Point ScreenSize;
 
     Snake(const cv::Point &screenSize);
+    void reset();
     void incAllowedLength();
     bool ifIntersected(const cv::Point &a, const cv::Point &b, const cv::Point &c, const cv::Point &d);
     int orientation(const cv::Point &a, const cv::Point &b, const cv::Point &c);

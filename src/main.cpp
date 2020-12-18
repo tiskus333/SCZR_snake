@@ -165,7 +165,7 @@ int main()
 
 
 
-const char *SHARED_MEMORY_PATH = "/frame_buffer";
+/* const char *SHARED_MEMORY_PATH = "/frame_buffer";
 
 void initProcess(void (*fun)())
 {
@@ -287,3 +287,4 @@ int main()
     shm_unlink(SHARED_MEMORY_PATH);
     exit(EXIT_SUCCESS);
 }
+ */
