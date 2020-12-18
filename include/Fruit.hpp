@@ -1,5 +1,5 @@
 #include <opencv2/core/types.hpp>
-
+#pragma once
 class Fruit
 {
 public:

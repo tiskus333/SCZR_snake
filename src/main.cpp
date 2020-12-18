@@ -4,7 +4,7 @@
 #include <iostream>
 #include <string.h>
 #include "Snake.hpp"
-#include "SharedMemory.h"
+#include "SharedMemory.hpp"
 
 bool is_paused = false;
 bool configure_options = false;

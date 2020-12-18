@@ -1,4 +1,4 @@
-#include "SharedMemory.h"
+#include "SharedMemory.hpp"
 
 void createSharedMemory(const char *path_name)
 {

@@ -4,6 +4,8 @@
 #include <cmath>
 #include "Fruit.hpp"
 
+#pragma once
+
 class Snake
 {
 public:

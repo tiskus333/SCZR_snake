@@ -1,5 +1,5 @@
-#ifndef SHARED_MEMORY_H
-#define SHARED_MEMORY_H
+#ifndef SHARED_MEMORY_HPP
+#define SHARED_MEMORY_HPP
 
 #include <stdio.h>
 #include <stdlib.h>
