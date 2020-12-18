@@ -9,6 +9,12 @@ Snake::Snake(const cv::Point &screenSize) : ScreenSize(screenSize)
     {
         allowedLength += ADD_LENGTH;
     }
+    void Snake::reset()
+    {
+        lives = 3;
+        score = 0;
+        snakeFruit.generatePoint(ScreenSize);
+    }
 
     bool Snake::ifIntersected(const cv::Point &a, const cv::Point &b, const cv::Point &c, const cv::Point &d)
     {

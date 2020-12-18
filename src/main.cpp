@@ -7,12 +7,18 @@ int main()
     
     do
     {
-        do{} while(snake_game.drawStartWindow());
+        do{snake_game.keyHandler();} while(snake_game.drawStartWindow());
         while (!snake_game.isEndGame()){
-            snake_game.processImage();
+            //std::cout<<"process \n";
+            snake_game.processImage();\
+            snake_game.keyHandler();
+            //std::cout<<"draw \n";
             snake_game.drawGameWindow();
+            snake_game.drawOptionsWindow();
+            snake_game.keyHandler();
         }
-        do{}while(snake_game.drawEndWindow());
+        do{snake_game.keyHandler();}while(snake_game.drawEndWindow());
+        
 
     } while (snake_game.isRepeat());
     return 0;

@@ -10,11 +10,11 @@
 class SnakeGame
 {
 private:
-    cv::VideoCapture cap;
-    Snake snake;
-    cv::Mat game_frame, frame, frame_HSV, frame_threshold, color_contour;
-    std::string window_game_name;
-    std::string window_detection_name;
+    cv::VideoCapture cap{0};
+    Snake snake{{GAME_SIZE_X,GAME_SIZE_Y}};
+    cv::Mat game_frame={}, frame={}, frame_threshold={};
+    std::string window_game_name = "Snake Game";
+    std::string window_detection_name = "Object Detection";
     
     bool is_paused = false;
     bool configure_options = false;
@@ -33,11 +33,9 @@ private:
     int low_H = 32, low_S = 100, low_V = 0;
     int high_H = 100, high_S = max_value, high_V = max_value;
 
-    std::vector<std::vector<cv::Point>> contours;
-    std::vector<std::pair<cv::Point2f,float>> circles;
-    std::vector<std::vector<cv::Point>> contours_poly;
 
-    char keyHandeler();
+    std::vector<std::pair<cv::Point2f,float>> circles={};
+
     bool getNewFrame();
 
     static void on_low_H_thresh_trackbar(int, void *);
@@ -58,8 +56,9 @@ public:
     bool drawEndWindow();
     bool isRepeat();
     bool isEndGame();
+    char keyHandler();
 };
-SnakeGame::SnakeGame(): cap(0), snake({GAME_SIZE_X,GAME_SIZE_Y})
+SnakeGame::SnakeGame()
 {
     srand((unsigned)time(0));
     if(cap.isOpened()) CV_Assert("Cam opened failed");  // tmp move to proper process
@@ -68,12 +67,10 @@ SnakeGame::SnakeGame(): cap(0), snake({GAME_SIZE_X,GAME_SIZE_Y})
     cv::namedWindow(window_game_name);
     //cv::namedWindow(window_detection_name);
 
-    max_value_H = 180;
-    max_value = 255;
-    low_H = 32; low_S = 100; low_V = 0;
-    high_H = 100; high_S = max_value; high_V = max_value;
-    window_game_name = "Snake Game";
-    window_detection_name = "Object Detection";
+    // max_value_H = 180;
+    // max_value = 255;
+    // low_H = 32; low_S = 100; low_V = 0;
+    // high_H = 100; high_S = max_value; high_V = max_value;
 }
 
 SnakeGame::~SnakeGame()
@@ -98,25 +95,41 @@ void SnakeGame::processImage()
 
     cv::medianBlur(frame,frame,15);
     // Convert from BGR to HSV colorspace
-    cv::cvtColor(frame, frame_HSV, cv::COLOR_BGR2HSV);
+    cv::cvtColor(frame, frame_threshold, cv::COLOR_BGR2HSV);
     // Detect the object based on HSV Range Values
-    cv::inRange(frame_HSV, cv::Scalar(low_H, low_S, low_V), cv::Scalar(high_H, high_S, high_V), frame_threshold);
+    cv::inRange(frame_threshold, cv::Scalar(low_H, low_S, low_V), cv::Scalar(high_H, high_S, high_V), frame_threshold);
 
+    //contours.clear();
+    std::vector<std::vector<cv::Point>> contours;
     cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_OPEN,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
     cv::morphologyEx(frame_threshold,frame_threshold,cv::MORPH_CLOSE,cv::getStructuringElement(cv::MorphShapes::MORPH_RECT, cv::Size(10,10)));
     cv::findContours(frame_threshold, contours, cv::RETR_TREE, cv::CHAIN_APPROX_SIMPLE);
-
-    contours_poly.clear();
-    contours_poly.reserve(contours.size());
+    //std::cout<<"morph \n";
+    std::vector<std::vector<cv::Point>> contours_poly(contours.size());
     circles.clear();
-    circles.reserve(contours.size()); 
+    circles.reserve(contours.size());
+        //std::cout<<contours.size()<<std::endl;
+     
     try
     {
+        //std::cout<<"circles begin\n";
+
         for(size_t i = 0; i < contours.size(); ++i)
         {
             cv::approxPolyDP(contours[i],contours_poly[i],3,true);
+            //std::cout<<"approx\n";
+
             cv::minEnclosingCircle(contours[i],circles[i].first,circles[i].second);
+            //std::cout<<"encl circl\n";
         }
+        if(circles.size() > 0)
+        {
+            std::sort(circles.begin(), circles.end(),[](const auto &x, const auto &y){return y.second < x.second;});
+        
+        if(!is_paused)
+            end_game = snake.calculateSnake(circles[0].first);
+        }
+        //std::cout<<"circles end\n";
     }
     catch(const cv::Exception& e)
     {
@@ -126,17 +139,15 @@ void SnakeGame::processImage()
 
 void SnakeGame::drawGameWindow()
 {
+    //std::cout<<"draw \n";
     if(circles.size() > 0 )
     {
-        std::sort(circles.begin(), circles.end(),[](const auto &x, const auto &y){return y.second < x.second;});
-
         cv::circle(game_frame, circles[0].first,circles[0].second,{255,0,0});
         cv::circle(game_frame, circles[0].first,1,{0,0,255});
-        if(!is_paused)
-        end_game = snake.calculateSnake(circles[0].first);
+        
     }
-    snake.draw(game_frame);
-    cv::imshow(window_game_name,game_frame);
+        snake.draw(game_frame);
+    cv::imshow(window_game_name,game_frame); // tmp move to proper process
 
 }
 
@@ -145,14 +156,14 @@ bool SnakeGame::drawStartWindow()
     getNewFrame();
     cv::putText(frame,"Press SPACE to begin",{GAME_SIZE_X/2-150, GAME_SIZE_Y/2-20},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{0,0,255},2);
     cv::imshow(window_game_name,frame);
-    return cv::waitKey(1) == ' ';
+    return cv::waitKey(2) != ' ';
 }
 bool SnakeGame::drawEndWindow()
 {
     getNewFrame();
     cv::putText(frame,"Press SPACE to reset",{GAME_SIZE_X/2-150, GAME_SIZE_Y/2-20},cv::HersheyFonts::FONT_HERSHEY_DUPLEX,1,{0,0,255},2);
     cv::imshow(window_game_name,frame);
-    return cv::waitKey(1) == ' ';
+    return cv::waitKey(2) != ' ';
 }
 
 void SnakeGame::drawOptionsWindow()
@@ -166,11 +177,11 @@ void SnakeGame::drawOptionsWindow()
         cv::createTrackbar("High S", window_detection_name, &high_S, max_value, on_high_S_thresh_trackbar,this);
         cv::createTrackbar("Low V", window_detection_name, &low_V, max_value, on_low_V_thresh_trackbar,this);
         cv::createTrackbar("High V", window_detection_name, &high_V, max_value, on_high_V_thresh_trackbar,this);
-        cv::imshow(window_detection_name, frame_threshold); // tmp move to proper process
+        cv::imshow(window_detection_name, frame_threshold); 
     }
 }
 
-char SnakeGame::keyHandeler()
+char SnakeGame::keyHandler()
 {
     char key = cv::waitKey(1);
 
@@ -194,40 +205,49 @@ char SnakeGame::keyHandeler()
     return key;
 }
 bool SnakeGame::getNewFrame(){
-    cap>>frame;
+    if(cap.isOpened())
+        cap>>frame;
+    else  std::cout<<"cap not opened\n";
+    
     cv::flip(frame,frame,1);
     return frame.ptr() != nullptr;
 }
 
 
 
-void SnakeGame::on_low_H_thresh_trackbar(int, void *)
+void SnakeGame::on_low_H_thresh_trackbar(int, void * ptr)
 {
-    low_H = std::min(high_H-1, low_H);
-    cv::setTrackbarPos("Low H", window_detection_name, low_H);
+    SnakeGame *game = (SnakeGame*)ptr;
+    game->low_H = std::min(game->high_H-1, game->low_H);
+    cv::setTrackbarPos("Low H", game->window_detection_name, game->low_H);
 }
-void SnakeGame::on_high_H_thresh_trackbar(int, void *)
+void SnakeGame::on_high_H_thresh_trackbar(int, void * ptr)
 {
-    high_H = std::max(high_H, low_H+1);
-    cv::setTrackbarPos("High H", window_detection_name, high_H);
+    SnakeGame *game = (SnakeGame*)ptr;
+    game->high_H = std::max( game->high_H,  game->low_H+1);
+    cv::setTrackbarPos("High H", game->window_detection_name, game->high_H);
 }
-void SnakeGame::on_low_S_thresh_trackbar(int, void *)
+void SnakeGame::on_low_S_thresh_trackbar(int, void * ptr)
 {
-    low_S = std::min(high_S-1, low_S);
-    cv::setTrackbarPos("Low S", window_detection_name, low_S);
+    SnakeGame *game = (SnakeGame*)ptr;
+    game->low_S = std::min( game->high_S-1,  game->low_S);
+    cv::setTrackbarPos("Low S",game->window_detection_name, game->low_S);
 }
-void SnakeGame::on_high_S_thresh_trackbar(int, void *)
+void SnakeGame::on_high_S_thresh_trackbar(int, void * ptr)
 {
-    high_S = std::max(high_S, low_S+1);
-    cv::setTrackbarPos("High S", window_detection_name, high_S);
+    SnakeGame *game = (SnakeGame*)ptr;
+    game->high_S = std::max( game->high_S,  game->low_S+1);
+    cv::setTrackbarPos("High S", game->window_detection_name, game->high_S);
 }
-void SnakeGame::on_low_V_thresh_trackbar(int, void *)
+void SnakeGame::on_low_V_thresh_trackbar(int, void * ptr)
 {
-    low_V = std::min(high_V-1, low_V);
-    cv::setTrackbarPos("Low V", window_detection_name, low_V);
+    SnakeGame *game = (SnakeGame*)ptr;
+    game->low_V = std::min( game->high_V-1,  game->low_V);
+    cv::setTrackbarPos("Low V", game->window_detection_name, game->low_V);
 }
-void SnakeGame::on_high_V_thresh_trackbar(int, void *)
+void SnakeGame::on_high_V_thresh_trackbar(int, void * ptr)
 {
-    high_V = std::max(high_V, low_V+1);
-    cv::setTrackbarPos("High V", window_detection_name, high_V);
+    SnakeGame *game = (SnakeGame*)ptr;
+    game->high_V = std::max(game->high_V, game->low_V+1);
+    cv::setTrackbarPos("High V", game->window_detection_name, game->high_V);
 }

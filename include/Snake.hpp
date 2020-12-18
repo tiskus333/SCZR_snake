@@ -23,6 +23,7 @@ public:
 
     Snake(const cv::Point &screenSize);
     void incAllowedLength();
+    void reset();
     bool ifIntersected(const cv::Point &a, const cv::Point &b, const cv::Point &c, const cv::Point &d);
     int orientation(const cv::Point &a, const cv::Point &b, const cv::Point &c);
     void addPointToSnake(const int &x, const int &y);
