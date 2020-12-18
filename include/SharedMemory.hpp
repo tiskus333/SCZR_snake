@@ -14,7 +14,7 @@
 
 #define FRAME_SIZE 16
 
-typedef struct sharedMemory
+typedef struct SharedMemory
 {
     sem_t sem_read;
     sem_t sem_write;
