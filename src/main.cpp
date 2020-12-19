@@ -47,6 +47,7 @@ static void on_high_V_thresh_trackbar(int, void *) {
 
 const char *FRAME = "/frame_buffer";
 const char *GAME = "/game_frame_buffer";
+const char *GAME_STATE = "/game_state";
 
 void initProcess(void (*fun)()) {
   if (fork() == 0) {
@@ -59,6 +60,8 @@ void initProcess(void (*fun)()) {
 void processA() {
   std::cout << getpid() << std::endl;
   sh_m *shmp = openSharedMemory(FRAME);
+  gm_st *game_state = openSharedGameState(GAME_STATE);
+
   cv::Mat frame;
   cv::VideoCapture camera(0);
   if (camera.isOpened())
@@ -66,18 +69,21 @@ void processA() {
   camera.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
   camera.set(cv::CAP_PROP_FRAME_HEIGHT, GAME_SIZE_Y);
 
-  for (int i = 0; i < 3000; ++i) {
+  while (game_state->readKey() != 27) {
     camera >> frame;
     shmp->writeFrame(frame);
   }
   // clear after process is finished
   shm_unlink(FRAME);
+  shm_unlink(GAME_STATE);
   camera.release();
 }
 
 void processB() {
   sh_m *shmp_f = openSharedMemory(FRAME);
   sh_m *shmp_g = openSharedMemory(GAME);
+  gm_st *game_state = openSharedGameState(GAME_STATE);
+
   uchar frame_data[DATA_SIZE];
   cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
 
@@ -89,17 +95,17 @@ void processB() {
 
   do {
     Snake snake({GAME_SIZE_X, GAME_SIZE_Y});
-    // do {
-    //   shmp_f->readFrame(frame);
-    //   cv::flip(frame, frame, 1);
-    //   cv::putText(frame, "Press SPACE to begin",
-    //               {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
-    //               cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
-    //   shmp_g->writeFrame(frame);
-    //   shmp_g->readKey(key);
-    //   if (key == 27)
-    //     return;
-    // } while (key != ' ');
+    do {
+      shmp_f->readFrame(frame);
+      cv::flip(frame, frame, 1);
+      cv::putText(frame, "Press SPACE to begin",
+                  {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
+                  cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
+      shmp_g->writeFrame(frame);
+      key = game_state->readKey();
+      if (key == 27)
+        return;
+    } while (key != ' ');
 
     do {
       // cap >> frame;
@@ -166,18 +172,18 @@ void processB() {
         cv::imshow(window_detection_name, frame_threshold);
       }
 
-      // readKey(shmp_g, key);
-      // if (key == 27) {
-      //   return;
-      // }
-      // if (key == 'o') {
-      //   configure_options = !configure_options;
-      //   is_paused = !is_paused;
-      //   if (cv::getWindowProperty(window_detection_name, cv::WINDOW_AUTOSIZE)
-      //   !=
-      //       -1)
-      //     cv::destroyWindow(window_detection_name);
-      // }
+      key = game_state->readKey();
+      if (key == 27) {
+        return;
+      }
+      if (key == 'o') {
+        configure_options = !configure_options;
+        is_paused = !is_paused;
+        if (cv::getWindowProperty(window_detection_name, cv::WINDOW_AUTOSIZE)
+        !=
+            -1)
+          cv::destroyWindow(window_detection_name);
+      }
     } while (!end_game);
 
     // do {
@@ -200,10 +206,13 @@ void processB() {
   } while (repeat_game);
   shm_unlink(FRAME);
   shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
 }
 
 void processC() {
   sh_m *shmp = openSharedMemory(GAME);
+  gm_st *game_state = openSharedGameState(GAME_STATE);
+
   uchar frame_data[DATA_SIZE];
   uchar key_pressed = '_';
   cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
@@ -214,19 +223,23 @@ void processC() {
     shmp->readFrame(frame);
     cv::imshow(window_game_name, frame);
     key_pressed = cv::waitKey(1);
+    game_state->writeKey(key_pressed);
     // shmp->writeKey(key_pressed);
   }
   // clear after process is finished
   shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
 }
 
 int main() {
   // unlink from shared memory object if still exists
   shm_unlink(FRAME);
   shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
 
   createSharedMemory(FRAME);
   createSharedMemory(GAME);
+  createSharedGameState(GAME_STATE);
 
   initProcess(processA);
   initProcess(processB);
@@ -235,5 +248,6 @@ int main() {
   sleep(35);
   shm_unlink(FRAME);
   shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
   exit(EXIT_SUCCESS);
 }
