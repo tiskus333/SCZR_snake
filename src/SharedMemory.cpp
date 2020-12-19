@@ -54,11 +54,33 @@ sh_m *openSharedMemory(const char *path_name) {
 }
 
 void SharedMemory::sendToSharedMemory(const unsigned char *p_data,
-                                      const size_t data_size) {
-  memcpy(&this->frame, p_data, std::min(this->size, data_size));
+                                      const size_t data_size,
+                                      const int offset) {
+  // close write semaphore
+  if (sem_wait(&sem_write)) {
+    perror("A: sem_wait error.");
+    exit(EXIT_FAILURE);
+  }
+  memcpy(&this->frame[offset], p_data, std::min(this->size, data_size));
+  // open read semaphore
+  if (sem_post(&sem_read)) {
+    perror("A: sem_post error.");
+    exit(EXIT_FAILURE);
+  }
 }
 
 void SharedMemory::receiveFromSharedMemory(unsigned char *p_write_to,
-                                           const size_t data_size) {
-  memcpy(p_write_to, &this->frame, std::min(this->size, data_size));
+                                           const size_t data_size,
+                                           const int offset) {
+  // close read semaphore
+  if (sem_wait(&sem_read)) {
+    perror("A: sem_wait error.");
+    exit(EXIT_FAILURE);
+  }
+  memcpy(p_write_to, &this->frame[offset], std::min(this->size, data_size));
+  // open write semaphore
+  if (sem_post(&sem_write)) {
+    perror("A: sem_post error.");
+    exit(EXIT_FAILURE);
+  }
 }
