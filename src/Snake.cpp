@@ -48,12 +48,15 @@ cv::Point Snake::getPoint(int i) { return snakeBody[i]; }
 
 bool Snake::checkIfEaten() {
   int dist = sectionLength.back() / snakeFruit.fruitRadius + 1;
-  int diffX =
-      (getPoint(snakeBody.size() - 1).x - getPoint(snakeBody.size() - 2).x) /
-      dist;
-  int diffY =
-      (getPoint(snakeBody.size() - 1).y - getPoint(snakeBody.size() - 2).y) /
-      dist;
+  int diffX = 0, diffY = 0;
+  if (snakeBody.size() > 1) {
+    diffX =
+        (getPoint(snakeBody.size() - 1).x - getPoint(snakeBody.size() - 2).x) /
+        dist;
+    diffY =
+        (getPoint(snakeBody.size() - 1).y - getPoint(snakeBody.size() - 2).y) /
+        dist;
+  }
 
   for (int i = 1; i <= dist; ++i)
     if (snakeFruit.checkIfEat(snakeBody.back() -
@@ -63,7 +66,7 @@ bool Snake::checkIfEaten() {
 }
 
 void Snake::draw(cv::Mat &frame) {
-  if (snakeBody.size() > 0)
+  if (snakeBody.size() > 1)
     for (auto it = snakeBody.crbegin(); it != snakeBody.crend() - 1; ++it) {
       cv::line(frame, *it, *(it + 1), {127, 8, 255}, 5);
     }
@@ -83,7 +86,7 @@ bool Snake::calculateSnake(const cv::Point &point) {
     int distance = int(sqrt(pow(snakeBody.back().x - point.x, 2) +
                             pow(snakeBody.back().y - point.y, 2)));
 
-    if (point.x != 0 && point.y != 0 && distance > 1) // uncomment later
+    if (point.x != 0 && point.y != 0) // uncomment later
     {
       addToSnake(point);
       addValueToLength(distance);
