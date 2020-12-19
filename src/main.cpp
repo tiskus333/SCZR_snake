@@ -59,6 +59,7 @@ void initProcess(void (*fun)()) {
 
 // odczyt kamery: klatka -> pamiec wspoldzielona
 void processA() {
+  std::cout << "A: " << getpid() << std::endl;
   sh_m *shmp = openSharedMemory(FRAME);
   gm_st *game_state = openSharedGameState(GAME_STATE);
 
@@ -80,6 +81,7 @@ void processA() {
 }
 
 void processB() {
+  std::cout << "B: " << getpid() << std::endl;
   sh_m *shmp_f = openSharedMemory(FRAME);
   sh_m *shmp_g = openSharedMemory(GAME);
   gm_st *game_state = openSharedGameState(GAME_STATE);
@@ -199,8 +201,10 @@ void processB() {
       key = game_state->readKey();
       if (key == ' ')
         repeat_game = true;
-      if (key == 27)
-        return;
+      if (key == 27) {
+        end_game = true;
+        repeat_game = false;
+      }
     } while (key != ' ');
 
   } while (repeat_game);
@@ -210,6 +214,7 @@ void processB() {
 }
 
 void processC() {
+  std::cout << "C: " << getpid() << std::endl;
   sh_m *shmp = openSharedMemory(GAME);
   gm_st *game_state = openSharedGameState(GAME_STATE);
 
@@ -231,6 +236,7 @@ void processC() {
 }
 
 int main(int argc, char *argv[]) {
+  std::cout << "M: " << getpid() << std::endl;
   // unlink from shared memory object if still exists
   MEMORY_MODES mode = MEMORY_MODES::SHARED_MEMORY;
   if (argc == 3) {
@@ -254,8 +260,9 @@ int main(int argc, char *argv[]) {
   initProcess(processB);
   initProcess(processC);
   // unlink from shared memory object
-  
-  while (game_state->readKey() != 27) { }
+
+  while (game_state->readKey() != 27) {
+  }
 
   shm_unlink(FRAME);
   shm_unlink(GAME);
