@@ -1,6 +1,8 @@
 
 #include "SharedMemory.hpp"
 #include "Snake.hpp"
+#include "Pipe.h"
+
 #include <iostream>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -49,6 +51,9 @@ static void on_high_V_thresh_trackbar(int, void *) {
 const char *FRAME = "/frame_buffer";
 const char *GAME = "/game_frame_buffer";
 const char *GAME_STATE = "/game_state";
+
+int pipe_a[2], pipe_b[2], pipe_c[2];
+
 enum class MEMORY_MODES { SHARED_MEMORY, PIPE, MESSEGE_QUEUE };
 
 void initProcess(void (*fun)()) {
@@ -71,13 +76,24 @@ void processA() {
   camera.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
   camera.set(cv::CAP_PROP_FRAME_HEIGHT, GAME_SIZE_Y);
 
+  close(pipe_a[0]);
+
+  int64_t timestamp;
+
   while (game_state->readKey() != 27) {
     camera >> frame;
+
+    timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    sendTimestamp(&timestamp, sizeof(timestamp), pipe_a[1]);
+
     shmp->writeFrame(frame);
   }
   // clear after process is finished
   shm_unlink(FRAME);
   shm_unlink(GAME_STATE);
+
+  close(pipe_a[1]);
+
   camera.release();
 }
 
@@ -97,14 +113,26 @@ void processB() {
 
   std::vector<std::vector<cv::Point>> contours;
 
+  close(pipe_b[0]);
+
+  int64_t timestamp;
+
   do {
     Snake snake({GAME_SIZE_X, GAME_SIZE_Y});
     do {
       shmp_f->readFrame(frame);
+      
+      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      
       cv::flip(frame, frame, 1);
       cv::putText(frame, "Press SPACE to begin",
                   {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
+      
+      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+
       shmp_g->writeFrame(frame);
       key = game_state->readKey();
       if (key == 27)
@@ -113,6 +141,10 @@ void processB() {
 
     do {
       shmp_f->readFrame(frame);
+
+      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
 
@@ -178,6 +210,10 @@ void processB() {
           cv::destroyWindow(window_detection_name);
         }
       }
+
+      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      
       shmp_g->writeFrame(game_frame);
 
       key = game_state->readKey();
@@ -192,6 +228,10 @@ void processB() {
 
     do {
       shmp_f->readFrame(frame);
+      
+      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      
       cv::flip(frame, frame, 1);
       cv::putText(frame, "GAME OVER!",
                   {GAME_SIZE_X / 2 - 75, GAME_SIZE_Y / 2 - 50},
@@ -199,6 +239,10 @@ void processB() {
       cv::putText(frame, "Press SPACE to reset",
                   {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
+
+      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+
       shmp_g->writeFrame(frame);
 
       key = game_state->readKey();
@@ -214,6 +258,8 @@ void processB() {
   shm_unlink(FRAME);
   shm_unlink(GAME);
   shm_unlink(GAME_STATE);
+
+  close(pipe_b[1]);
 }
 
 void processC() {
@@ -226,8 +272,16 @@ void processC() {
   cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
   cv::namedWindow(window_game_name);
 
+  close(pipe_c[0]);
+
+  int64_t timestamp;
+
   while (key_pressed != 27) {
     shmp->readFrame(frame);
+
+    timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    sendTimestamp(&timestamp, sizeof(timestamp), pipe_c[1]);
+
     cv::imshow(window_game_name, frame);
     key_pressed = cv::waitKey(1);
     game_state->writeKey(key_pressed);
@@ -236,6 +290,8 @@ void processC() {
   // clear after process is finished
   shm_unlink(GAME);
   shm_unlink(GAME_STATE);
+
+  close(pipe_c[1]);
 }
 
 int main(int argc, char *argv[]) {
@@ -259,13 +315,41 @@ int main(int argc, char *argv[]) {
 
   gm_st *game_state = createSharedGameState(GAME_STATE);
 
+  if (pipe(pipe_a) == -1)
+  {
+    perror("Cannot create pipe.");
+    exit(EXIT_FAILURE);
+  }
+  if (pipe(pipe_b) == -1)
+  {
+    perror("Cannot create pipe.");
+    exit(EXIT_FAILURE);
+  }
+  if (pipe(pipe_c) == -1)
+  {
+    perror("Cannot create pipe.");
+    exit(EXIT_FAILURE);
+  }
+
   initProcess(processA);
   initProcess(processB);
   initProcess(processC);
   // unlink from shared memory object
 
+  close(pipe_a[1]);
+  close(pipe_b[1]);
+  close(pipe_c[1]);
+  int64_t buff_a, buff_b[2], buff_c;
   while (game_state->readKey() != 27) {
+    receiveTimestamp(&buff_a, sizeof(int64_t), pipe_a[0]);
+    receiveTimestamp(&buff_b[0], sizeof(int64_t), pipe_b[0]);
+    receiveTimestamp(&buff_b[1], sizeof(int64_t), pipe_b[0]);
+    receiveTimestamp(&buff_c, sizeof(int64_t), pipe_c[0]);
+    std::cout << buff_b[0] - buff_a << " " << buff_c - buff_b[1] << " " << buff_c - buff_a << std::endl;  
   }
+  close(pipe_a[0]);
+  close(pipe_b[0]);
+  close(pipe_c[0]);
 
   shm_unlink(FRAME);
   shm_unlink(GAME);
