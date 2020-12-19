@@ -90,13 +90,13 @@ void processB() {
   do {
     Snake snake({GAME_SIZE_X, GAME_SIZE_Y});
     // do {
-    //   readFrame(shmp_f, frame);
+    //   shmp_f->readFrame(frame);
     //   cv::flip(frame, frame, 1);
     //   cv::putText(frame, "Press SPACE to begin",
     //               {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
     //               cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
-    //   writeFrame(shmp_g, frame);
-    //   readKey(shmp_g, key);
+    //   shmp_g->writeFrame(frame);
+    //   shmp_g->readKey(key);
     //   if (key == 27)
     //     return;
     // } while (key != ' ');
@@ -214,7 +214,7 @@ void processC() {
     shmp->readFrame(frame);
     cv::imshow(window_game_name, frame);
     key_pressed = cv::waitKey(1);
-    // writeKey(shmp, key_pressed);
+    // shmp->writeKey(key_pressed);
   }
   // clear after process is finished
   shm_unlink(GAME);
