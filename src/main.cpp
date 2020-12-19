@@ -88,6 +88,9 @@ void processA() {
 
     shmp->writeFrame(frame);
   }
+
+  sendTimestamp(&timestamp, sizeof(timestamp), pipe_a[1]);
+
   // clear after process is finished
   shm_unlink(FRAME);
   shm_unlink(GAME_STATE);
@@ -251,10 +254,14 @@ void processB() {
       if (key == 27) {
         end_game = true;
         repeat_game = false;
+        key = ' ';
       }
     } while (key != ' ');
 
   } while (repeat_game);
+
+  sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+
   shm_unlink(FRAME);
   shm_unlink(GAME);
   shm_unlink(GAME_STATE);
@@ -287,6 +294,9 @@ void processC() {
     game_state->writeKey(key_pressed);
     // shmp->writeKey(key_pressed);
   }
+
+  sendTimestamp(&timestamp, sizeof(timestamp), pipe_c[1]);
+
   // clear after process is finished
   shm_unlink(GAME);
   shm_unlink(GAME_STATE);
@@ -345,7 +355,7 @@ int main(int argc, char *argv[]) {
     receiveTimestamp(&buff_b[0], sizeof(int64_t), pipe_b[0]);
     receiveTimestamp(&buff_b[1], sizeof(int64_t), pipe_b[0]);
     receiveTimestamp(&buff_c, sizeof(int64_t), pipe_c[0]);
-    std::cout << buff_b[0] - buff_a << " " << buff_c - buff_b[1] << " " << buff_c - buff_a << std::endl;  
+    //std::cout << buff_b[0] - buff_a << " " << buff_c - buff_b[1] << " " << buff_c - buff_a << std::endl;  
   }
   close(pipe_a[0]);
   close(pipe_b[0]);
