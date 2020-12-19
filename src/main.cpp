@@ -17,7 +17,7 @@ const int max_value_H = 180;
 const int max_value = 255;
 const std::string window_game_name = "Snake Game";
 const std::string window_detection_name = "Object Detection";
-int low_H = 32, low_S = 100, low_V = 0;
+int low_H = 32, low_S = 100, low_V = 5;
 int high_H = 100, high_S = max_value, high_V = max_value;
 
 static void on_low_H_thresh_trackbar(int, void *) {
@@ -88,6 +88,7 @@ void processB() {
 
   uchar frame_data[DATA_SIZE];
   cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
+  cv::namedWindow(window_detection_name);
 
   unsigned char key;
 
@@ -169,21 +170,23 @@ void processB() {
                            on_low_V_thresh_trackbar);
         cv::createTrackbar("High V", window_detection_name, &high_V, max_value,
                            on_high_V_thresh_trackbar);
-        shmp_g->writeFrame(frame_threshold);
-        // cv::imshow(window_detection_name, frame_threshold);
-      } else
-        shmp_g->writeFrame(game_frame);
+        // shmp_g->writeFrame(frame_threshold);
+        cv::imshow(window_detection_name, frame_threshold);
+        if (cv::waitKey(1) == 'o') {
+          is_paused = false;
+          configure_options = false;
+          cv::destroyWindow(window_detection_name);
+        }
+      }
+      shmp_g->writeFrame(game_frame);
 
       key = game_state->readKey();
       if (key == 27) {
         return;
       }
       if (key == 'o') {
-        configure_options = !configure_options;
-        is_paused = !is_paused;
-        if (cv::getWindowProperty(window_detection_name, cv::WINDOW_AUTOSIZE) !=
-            -1)
-          cv::destroyWindow(window_detection_name);
+        configure_options = true;
+        is_paused = true;
       }
     } while (!end_game);
 
