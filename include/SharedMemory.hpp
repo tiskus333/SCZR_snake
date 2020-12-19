@@ -47,7 +47,7 @@ typedef struct SharedGameState {
     void writeKey(const char &key);
 } gm_st;
 
-void createSharedGameState(const char *path_name);
+gm_st *createSharedGameState(const char *path_name);
 gm_st *openSharedGameState(const char *path_name);
 
 #endif

@@ -247,13 +247,16 @@ int main(int argc, char *argv[]) {
 
   createSharedMemory(FRAME);
   createSharedMemory(GAME);
-  createSharedGameState(GAME_STATE);
+
+  gm_st *game_state = createSharedGameState(GAME_STATE);
 
   initProcess(processA);
   initProcess(processB);
   initProcess(processC);
   // unlink from shared memory object
-  // sleep(35);
+  
+  while (game_state->readKey() != 27) { }
+
   shm_unlink(FRAME);
   shm_unlink(GAME);
   shm_unlink(GAME_STATE);

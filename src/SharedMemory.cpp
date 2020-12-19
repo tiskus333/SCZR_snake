@@ -53,7 +53,7 @@ sh_m *openSharedMemory(const char *path_name) {
   return shmp;
 }
 
-void createSharedGameState(const char *path_name) {
+gm_st *createSharedGameState(const char *path_name) {
   // create shared memory structure
   int fd = shm_open(path_name, O_CREAT | O_EXCL | O_RDWR, S_IRUSR | S_IWUSR);
   if (fd == -1) {
@@ -98,6 +98,7 @@ void createSharedGameState(const char *path_name) {
     perror("main: Cannot init sem_write.");
     exit(EXIT_FAILURE);
   }
+  return shmp;
 }
 
 gm_st *openSharedGameState(const char *path_name) {
