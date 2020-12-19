@@ -35,3 +35,4 @@ public:
   void draw(cv::Mat &frame);
   bool calculateSnake(const cv::Point &point);
 };
+

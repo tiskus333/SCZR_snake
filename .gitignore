@@ -1,3 +1,4 @@
 .vscode/.easycpp
 .vscode/settings.json
 bin/*
+.vscode/c_cpp_properties.json

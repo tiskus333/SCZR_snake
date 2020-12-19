@@ -1,3 +1,4 @@
+
 #include "SharedMemory.hpp"
 #include "Snake.hpp"
 #include <iostream>
@@ -111,7 +112,6 @@ void processB() {
     } while (key != ' ');
 
     do {
-      // cap >> frame;
       shmp_f->readFrame(frame);
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
