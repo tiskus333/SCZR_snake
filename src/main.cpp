@@ -1,3 +1,5 @@
+
+#include "SharedMemory.hpp"
 #include "Snake.hpp"
 #include <iostream>
 #include <opencv2/highgui.hpp>
@@ -16,7 +18,7 @@ const int max_value_H = 180;
 const int max_value = 255;
 const std::string window_game_name = "Snake Game";
 const std::string window_detection_name = "Object Detection";
-int low_H = 32, low_S = 100, low_V = 0;
+int low_H = 32, low_S = 100, low_V = 5;
 int high_H = 100, high_S = max_value, high_V = max_value;
 
 static void on_low_H_thresh_trackbar(int, void *) {
@@ -43,37 +45,74 @@ static void on_high_V_thresh_trackbar(int, void *) {
   high_V = std::max(high_V, low_V + 1);
   cv::setTrackbarPos("High V", window_detection_name, high_V);
 }
-int main() {
-  srand((unsigned)time(0));
 
-  cv::VideoCapture cap(0);
-  if (cap.isOpened())
+const char *FRAME = "/frame_buffer";
+const char *GAME = "/game_frame_buffer";
+const char *GAME_STATE = "/game_state";
+enum class MEMORY_MODES { SHARED_MEMORY, PIPE, MESSEGE_QUEUE };
+
+void initProcess(void (*fun)()) {
+  if (fork() == 0) {
+    fun();
+    exit(EXIT_SUCCESS);
+  }
+}
+
+// odczyt kamery: klatka -> pamiec wspoldzielona
+void processA() {
+  std::cout << "A: " << getpid() << std::endl;
+  sh_m *shmp = openSharedMemory(FRAME);
+  gm_st *game_state = openSharedGameState(GAME_STATE);
+
+  cv::Mat frame;
+  cv::VideoCapture camera(0);
+  if (camera.isOpened())
     CV_Assert("Cam opened failed");
-  cap.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
-  cap.set(cv::CAP_PROP_FRAME_HEIGHT, GAME_SIZE_Y);
-  cv::namedWindow(window_game_name);
-  char key;
+  camera.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
+  camera.set(cv::CAP_PROP_FRAME_HEIGHT, GAME_SIZE_Y);
 
-  cv::Mat game_frame, frame, frame_threshold;
+  while (game_state->readKey() != 27) {
+    camera >> frame;
+    shmp->writeFrame(frame);
+  }
+  // clear after process is finished
+  shm_unlink(FRAME);
+  shm_unlink(GAME_STATE);
+  camera.release();
+}
+
+void processB() {
+  std::cout << "B: " << getpid() << std::endl;
+  sh_m *shmp_f = openSharedMemory(FRAME);
+  sh_m *shmp_g = openSharedMemory(GAME);
+  gm_st *game_state = openSharedGameState(GAME_STATE);
+
+  uchar frame_data[DATA_SIZE];
+  cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
+  cv::namedWindow(window_detection_name);
+
+  unsigned char key;
+
+  cv::Mat game_frame, frame_threshold;
 
   std::vector<std::vector<cv::Point>> contours;
 
   do {
     Snake snake({GAME_SIZE_X, GAME_SIZE_Y});
     do {
-      cap >> frame;
+      shmp_f->readFrame(frame);
       cv::flip(frame, frame, 1);
       cv::putText(frame, "Press SPACE to begin",
                   {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
-      cv::imshow(window_game_name, frame);
-      key = cv::waitKey(1);
+      shmp_g->writeFrame(frame);
+      key = game_state->readKey();
       if (key == 27)
-        return 0;
+        return;
     } while (key != ' ');
 
     do {
-      cap >> frame;
+      shmp_f->readFrame(frame);
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
 
@@ -118,10 +157,6 @@ int main() {
       }
       snake.draw(game_frame);
 
-      // std::cout<<sizeof(game_frame.elemSize() * game_frame.size().area());
-      // get frame from smh
-      cv::imshow(window_game_name, game_frame);
-
       if (configure_options) {
         cv::createTrackbar("Low H", window_detection_name, &low_H, max_value_H,
                            on_low_H_thresh_trackbar);
@@ -135,25 +170,28 @@ int main() {
                            on_low_V_thresh_trackbar);
         cv::createTrackbar("High V", window_detection_name, &high_V, max_value,
                            on_high_V_thresh_trackbar);
+        // shmp_g->writeFrame(frame_threshold);
         cv::imshow(window_detection_name, frame_threshold);
+        if (cv::waitKey(1) == 'o') {
+          is_paused = false;
+          configure_options = false;
+          cv::destroyWindow(window_detection_name);
+        }
       }
+      shmp_g->writeFrame(game_frame);
 
-      key = cv::waitKey(1);
+      key = game_state->readKey();
       if (key == 27) {
-        cap.release();
-        return 0;
+        return;
       }
       if (key == 'o') {
-        configure_options = !configure_options;
-        is_paused = !is_paused;
-        if (cv::getWindowProperty(window_detection_name, cv::WINDOW_AUTOSIZE) !=
-            -1)
-          cv::destroyWindow(window_detection_name);
+        configure_options = true;
+        is_paused = true;
       }
     } while (!end_game);
 
     do {
-      cap >> frame;
+      shmp_f->readFrame(frame);
       cv::flip(frame, frame, 1);
       cv::putText(frame, "GAME OVER!",
                   {GAME_SIZE_X / 2 - 75, GAME_SIZE_Y / 2 - 50},
@@ -161,15 +199,76 @@ int main() {
       cv::putText(frame, "Press SPACE to reset",
                   {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
-      cv::imshow(window_game_name, frame);
-      key = cv::waitKey(1);
+      shmp_g->writeFrame(frame);
+
+      key = game_state->readKey();
       if (key == ' ')
         repeat_game = true;
-      if (key == 27)
-        return 0;
+      if (key == 27) {
+        end_game = true;
+        repeat_game = false;
+      }
     } while (key != ' ');
 
   } while (repeat_game);
-  cap.release();
-  return 0;
+  shm_unlink(FRAME);
+  shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
+}
+
+void processC() {
+  std::cout << "C: " << getpid() << std::endl;
+  sh_m *shmp = openSharedMemory(GAME);
+  gm_st *game_state = openSharedGameState(GAME_STATE);
+
+  uchar frame_data[DATA_SIZE];
+  uchar key_pressed = '_';
+  cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
+  cv::namedWindow(window_game_name);
+
+  while (key_pressed != 27) {
+    shmp->readFrame(frame);
+    cv::imshow(window_game_name, frame);
+    key_pressed = cv::waitKey(1);
+    game_state->writeKey(key_pressed);
+    // shmp->writeKey(key_pressed);
+  }
+  // clear after process is finished
+  shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
+}
+
+int main(int argc, char *argv[]) {
+  std::cout << "M: " << getpid() << std::endl;
+  // unlink from shared memory object if still exists
+  MEMORY_MODES mode = MEMORY_MODES::SHARED_MEMORY;
+  if (argc == 3) {
+    const std::string val = argv[2];
+    if (val == "pipe")
+      mode = MEMORY_MODES::PIPE;
+    if (val == "msgq")
+      mode = MEMORY_MODES::MESSEGE_QUEUE;
+  }
+
+  shm_unlink(FRAME);
+  shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
+
+  createSharedMemory(FRAME);
+  createSharedMemory(GAME);
+
+  gm_st *game_state = createSharedGameState(GAME_STATE);
+
+  initProcess(processA);
+  initProcess(processB);
+  initProcess(processC);
+  // unlink from shared memory object
+
+  while (game_state->readKey() != 27) {
+  }
+
+  shm_unlink(FRAME);
+  shm_unlink(GAME);
+  shm_unlink(GAME_STATE);
+  exit(EXIT_SUCCESS);
 }

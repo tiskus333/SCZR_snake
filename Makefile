@@ -8,8 +8,8 @@ INCLUDE	:= include
 OPENCV	:= `pkg-config opencv4 --cflags --libs`
 
 
-LIBRARIES	:= $(OPENCV)
-EXECUTABLE	:= snake.o
+LIBRARIES	:= $(OPENCV) -pthread -lrt
+
 
 
 all: $(BIN)/$(EXECUTABLE)

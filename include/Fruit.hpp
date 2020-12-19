@@ -3,7 +3,7 @@
 class Fruit {
 public:
   cv::Point fruitPoint;
-  const int fruitRadius = 20;
+  const int fruitRadius = 15;
   const int windowOffset = 25 + fruitRadius;
 
   void generatePoint(const cv::Point &screenSize) {

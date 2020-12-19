@@ -13,8 +13,8 @@ public:
   std::deque<int> sectionLength;
   Fruit snakeFruit;
 
-  int allowedLength = 50;
-  const int ADD_LENGTH = 5;
+  int allowedLength = 100;
+  const int ADD_LENGTH = 10;
   int length = 0;
   int score = 0;
   int lives = 3;
@@ -35,3 +35,4 @@ public:
   void draw(cv::Mat &frame);
   bool calculateSnake(const cv::Point &point);
 };
+
