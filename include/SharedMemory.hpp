@@ -1,5 +1,5 @@
-#ifndef SHARED_MEMORY_HPP
-#define SHARED_MEMORY_HPP
+#ifndef SHAREDMEMORY_H
+#define SHAREDMEMORY_H
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,12 +12,20 @@
 #include <fcntl.h>    // shared memory
 #include <sys/mman.h> //
 
-#define FRAME_SIZE 16
+#include <string.h>
+
+#include <algorithm>
+
+const size_t DATA_SIZE = 640 * 480 * 3;
 
 typedef struct SharedMemory {
   sem_t sem_read;
   sem_t sem_write;
-  char frame[FRAME_SIZE];
+  size_t size;
+  unsigned char frame[DATA_SIZE];
+
+  void sendToSharedMemory(const unsigned char *p_data, size_t data_size);
+  void receiveFromSharedMemory(unsigned char *p_write_to, size_t data_size);
 } sh_m;
 
 void createSharedMemory(const char *path_name);

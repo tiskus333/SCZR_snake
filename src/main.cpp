@@ -20,7 +20,7 @@ const std::string window_detection_name = "Object Detection";
 int low_H = 32, low_S = 100, low_V = 0;
 int high_H = 100, high_S = max_value, high_V = max_value;
 
-static void on_low_H_thresh_trackbar(int, void *) {
+/* static void on_low_H_thresh_trackbar(int, void *) {
   low_H = std::min(high_H - 1, low_H);
   cv::setTrackbarPos("Low H", window_detection_name, low_H);
 }
@@ -43,8 +43,8 @@ static void on_low_V_thresh_trackbar(int, void *) {
 static void on_high_V_thresh_trackbar(int, void *) {
   high_V = std::max(high_V, low_V + 1);
   cv::setTrackbarPos("High V", window_detection_name, high_V);
-}
-int main() {
+} */
+/* int main() {
   srand((unsigned)time(0));
 
   cv::VideoCapture cap(0);
@@ -173,128 +173,97 @@ int main() {
   } while (repeat_game);
   cap.release();
   return 0;
-}
+} */
 
-/* const char *SHARED_MEMORY_PATH = "/frame_buffer";
+const char *SHARED_MEMORY_PATH = "/frame_buffer";
 
-void initProcess(void (*fun)())
-{
-    if (fork() == 0)
-    {
-        fun();
-        exit(EXIT_SUCCESS);
-    }
+void initProcess(void (*fun)()) {
+  if (fork() == 0) {
+    fun();
+    exit(EXIT_SUCCESS);
+  }
 }
 
 // odczyt kamery: klatka -> pamiec wspoldzielona
-void CameraRead()
-{
-    sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
+void processA() {
+  std::cout << getpid() << std::endl;
+  sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
+  cv::Mat frame;
+  cv::VideoCapture camera(0);
+  if (camera.isOpened())
+    CV_Assert("Cam opened failed");
+  camera.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
+  camera.set(cv::CAP_PROP_FRAME_HEIGHT, GAME_SIZE_Y);
 
-    for (int i = 0; i < 10; ++i)
-    {
-        // close write semaphore
-        if (sem_wait(&shmp->sem_write))
-        {
-            perror("A: sem_wait error.");
-            exit(EXIT_FAILURE);
-        }
+  for (int i = 0; i < 1000; ++i) {
+    camera >> frame;
+    cv::imshow("WRITING", frame);
+    cv::waitKey(1);
 
-        // writing data into shared memory
-        std::string str = "A frame #" + std::to_string(i);
-        std::cout << "A: Writing data: " << str << std::endl;
-        const char *chr = str.c_str();
-        memcpy(&shmp->frame, chr, strlen(chr));
-
-        // open read semaphore
-        if (sem_post(&shmp->sem_read))
-        {
-            perror("A: sem_post error.");
-            exit(EXIT_FAILURE);
-        }
-
-        // data processing
-        sleep(1); // simulates data processing
+    // close write semaphore
+    if (sem_wait(&shmp->sem_write)) {
+      perror("A: sem_wait error.");
+      exit(EXIT_FAILURE);
     }
+    std::cout << " writing \n";
+    // writing data into shared memory
+    shmp->sendToSharedMemory(frame.data, DATA_SIZE);
 
-    // clear after process is finished
-    shm_unlink(SHARED_MEMORY_PATH);
-}
-
-void GameCalculate()
-{
-    sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
-
-    for (int i = 0; i < 10; ++i)
-    {
-        // close read semaphore
-        if (sem_wait(&shmp->sem_read))
-        {
-            perror("B: sem_wait error.");
-            exit(EXIT_FAILURE);
-        }
-
-        // reading data from shared memory
-        printf("B: Reading data: %s\n", &shmp->frame);
-
-        // open write semaphore
-        if (sem_post(&shmp->sem_write))
-        {
-            perror("B: sem_post error.");
-            exit(EXIT_FAILURE);
-        }
-
-        // data processing
-        sleep(1); // simulates data processing
+    // open read semaphore
+    if (sem_post(&shmp->sem_read)) {
+      perror("A: sem_post error.");
+      exit(EXIT_FAILURE);
     }
-
-    // clear after process is finished
-    shm_unlink(SHARED_MEMORY_PATH);
+    std::cout << "Leave writing \n";
+  }
+  // clear after process is finished
+  shm_unlink(SHARED_MEMORY_PATH);
+  camera.release();
 }
-void GameDraw()
-{
-    sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
 
-    for (int i = 0; i < 10; ++i)
-    {
-        // close read semaphore
-        if (sem_wait(&shmp->sem_read))
-        {
-            perror("B: sem_wait error.");
-            exit(EXIT_FAILURE);
-        }
+void processC() {
+  sh_m *shmp = openSharedMemory(SHARED_MEMORY_PATH);
+  uchar frame_data[DATA_SIZE];
+  cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
+  cv::namedWindow(window_game_name);
+  std::cout << getpid() << std::endl;
 
-        // reading data from shared memory
-        printf("B: Reading data: %s\n", &shmp->frame);
+  for (int i = 0; i < 1000; ++i) {
 
-        // open write semaphore
-        if (sem_post(&shmp->sem_write))
-        {
-            perror("B: sem_post error.");
-            exit(EXIT_FAILURE);
-        }
-
-        // data processing
-        sleep(1); // simulates data processing
+    // close read semaphore
+    if (sem_wait(&shmp->sem_read)) {
+      perror("A: sem_wait error.");
+      exit(EXIT_FAILURE);
     }
+    std::cout << " reading \n";
+    // receiving data from shared memory
+    shmp->receiveFromSharedMemory(frame_data, DATA_SIZE);
 
-    // clear after process is finished
-    shm_unlink(SHARED_MEMORY_PATH);
+    // open read semaphore
+    if (sem_post(&shmp->sem_write)) {
+      perror("A: sem_post error.");
+      exit(EXIT_FAILURE);
+    }
+    std::cout << "Leave reading \n";
+    // memcpy(frame.data, frame_data, DATA_SIZE);
+
+    cv::imshow(window_game_name, frame);
+    cv::waitKey(1);
+  }
+  // clear after process is finished
+  shm_unlink(SHARED_MEMORY_PATH);
 }
 
+int main() {
+  // unlink from shared memory object if still exists
+  shm_unlink(SHARED_MEMORY_PATH);
 
-int main()
-{
-    // unlink from shared memory object if still exists
-    shm_unlink(SHARED_MEMORY_PATH);
+  createSharedMemory(SHARED_MEMORY_PATH);
 
-    createSharedMemory(SHARED_MEMORY_PATH);
-
-    initProcess(processA);
-    initProcess(processB);
-    sleep(10);
-    // unlink from shared memory object
-    shm_unlink(SHARED_MEMORY_PATH);
-    exit(EXIT_SUCCESS);
+  initProcess(processA);
+  initProcess(processC);
+  // unlink from shared memory object
+  sleep(30);
+  shm_unlink(SHARED_MEMORY_PATH);
+  exit(EXIT_SUCCESS);
 }
- */

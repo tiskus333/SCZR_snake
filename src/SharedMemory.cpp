@@ -22,6 +22,8 @@ void createSharedMemory(const char *path_name) {
     exit(EXIT_FAILURE);
   }
 
+  shmp->size = DATA_SIZE;
+
   // initialize semaphores as process-shared
   if (sem_init(&shmp->sem_read, 1, 0) == -1) {
     perror("main: Cannot init sem_read.");
@@ -49,4 +51,14 @@ sh_m *openSharedMemory(const char *path_name) {
     exit(EXIT_FAILURE);
   }
   return shmp;
+}
+
+void SharedMemory::sendToSharedMemory(const unsigned char *p_data,
+                                      const size_t data_size) {
+  memcpy(&this->frame, p_data, std::min(this->size, data_size));
+}
+
+void SharedMemory::receiveFromSharedMemory(unsigned char *p_write_to,
+                                           const size_t data_size) {
+  memcpy(p_write_to, &this->frame, std::min(this->size, data_size));
 }
