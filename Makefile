@@ -4,7 +4,9 @@ CXX_FLAGS := -Wall -Wextra -std=c++17
 BIN		:= bin
 SRC		:= src
 INCLUDE	:= include
+
 OPENCV	:= `pkg-config opencv4 --cflags --libs`
+
 
 LIBRARIES	:= $(OPENCV)
 EXECUTABLE	:= snake.o
