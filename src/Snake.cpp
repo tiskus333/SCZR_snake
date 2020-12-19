@@ -57,6 +57,11 @@ bool Snake::checkIfEaten() {
         (getPoint(snakeBody.size() - 1).y - getPoint(snakeBody.size() - 2).y) /
         dist;
   }
+  for (int i = 1; i <= dist; ++i)
+    if (snakeFruit.checkIfEat(snakeBody.back() -
+                              cv::Point(diffX * i, diffY * i)))
+      return true;
+  return false;
 }
 
 void Snake::draw(cv::Mat &frame) {
