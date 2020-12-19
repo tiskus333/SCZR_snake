@@ -1,4 +1,3 @@
-#include "SharedMemory.hpp"
 #include "Snake.hpp"
 #include <iostream>
 #include <opencv2/highgui.hpp>
@@ -55,7 +54,7 @@ int main() {
   cv::namedWindow(window_game_name);
   char key;
 
-  cv::Mat game_frame, frame, frame_HSV, frame_threshold, color_contour;
+  cv::Mat game_frame, frame, frame_threshold;
 
   std::vector<std::vector<cv::Point>> contours;
 
@@ -80,9 +79,9 @@ int main() {
 
       cv::medianBlur(frame, frame, 15);
       // Convert from BGR to HSV colorspace
-      cv::cvtColor(frame, frame_HSV, cv::COLOR_BGR2HSV);
+      cv::cvtColor(frame, frame_threshold, cv::COLOR_BGR2HSV);
       // Detect the object based on HSV Range Values
-      cv::inRange(frame_HSV, cv::Scalar(low_H, low_S, low_V),
+      cv::inRange(frame_threshold, cv::Scalar(low_H, low_S, low_V),
                   cv::Scalar(high_H, high_S, high_V), frame_threshold);
 
       cv::morphologyEx(frame_threshold, frame_threshold, cv::MORPH_OPEN,
