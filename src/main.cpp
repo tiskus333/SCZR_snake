@@ -48,6 +48,7 @@ static void on_high_V_thresh_trackbar(int, void *) {
 const char *FRAME = "/frame_buffer";
 const char *GAME = "/game_frame_buffer";
 const char *GAME_STATE = "/game_state";
+enum class MEMORY_MODES { SHARED_MEMORY, PIPE, MESSEGE_QUEUE };
 
 void initProcess(void (*fun)()) {
   if (fork() == 0) {
@@ -58,7 +59,6 @@ void initProcess(void (*fun)()) {
 
 // odczyt kamery: klatka -> pamiec wspoldzielona
 void processA() {
-  std::cout << getpid() << std::endl;
   sh_m *shmp = openSharedMemory(FRAME);
   gm_st *game_state = openSharedGameState(GAME_STATE);
 
@@ -179,29 +179,29 @@ void processB() {
       if (key == 'o') {
         configure_options = !configure_options;
         is_paused = !is_paused;
-        if (cv::getWindowProperty(window_detection_name, cv::WINDOW_AUTOSIZE)
-        !=
+        if (cv::getWindowProperty(window_detection_name, cv::WINDOW_AUTOSIZE) !=
             -1)
           cv::destroyWindow(window_detection_name);
       }
     } while (!end_game);
 
-    // do {
-    //   readFrame(shmp_f, frame);
-    //   cv::flip(frame, frame, 1);
-    //   cv::putText(frame, "GAME OVER!",
-    //               {GAME_SIZE_X / 2 - 75, GAME_SIZE_Y / 2 - 50},
-    //               cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
-    //   cv::putText(frame, "Press SPACE to reset",
-    //               {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
-    //               cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
+    do {
+      shmp_f->readFrame(frame);
+      cv::flip(frame, frame, 1);
+      cv::putText(frame, "GAME OVER!",
+                  {GAME_SIZE_X / 2 - 75, GAME_SIZE_Y / 2 - 50},
+                  cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
+      cv::putText(frame, "Press SPACE to reset",
+                  {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
+                  cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
+      shmp_g->writeFrame(frame);
 
-    //   readKey(shmp_g, key);
-    //   if (key == ' ')
-    //     repeat_game = true;
-    //   if (key == 27)
-    //     return;
-    // } while (key != ' ');
+      key = game_state->readKey();
+      if (key == ' ')
+        repeat_game = true;
+      if (key == 27)
+        return;
+    } while (key != ' ');
 
   } while (repeat_game);
   shm_unlink(FRAME);
@@ -217,7 +217,6 @@ void processC() {
   uchar key_pressed = '_';
   cv::Mat frame(GAME_SIZE_Y, GAME_SIZE_X, CV_8UC3, frame_data);
   cv::namedWindow(window_game_name);
-  std::cout << getpid() << std::endl;
 
   while (key_pressed != 27) {
     shmp->readFrame(frame);
@@ -231,8 +230,17 @@ void processC() {
   shm_unlink(GAME_STATE);
 }
 
-int main() {
+int main(int argc, char *argv[]) {
   // unlink from shared memory object if still exists
+  MEMORY_MODES mode = MEMORY_MODES::SHARED_MEMORY;
+  if (argc == 3) {
+    const std::string val = argv[2];
+    if (val == "pipe")
+      mode = MEMORY_MODES::PIPE;
+    if (val == "msgq")
+      mode = MEMORY_MODES::MESSEGE_QUEUE;
+  }
+
   shm_unlink(FRAME);
   shm_unlink(GAME);
   shm_unlink(GAME_STATE);
@@ -245,7 +253,7 @@ int main() {
   initProcess(processB);
   initProcess(processC);
   // unlink from shared memory object
-  sleep(35);
+  // sleep(35);
   shm_unlink(FRAME);
   shm_unlink(GAME);
   shm_unlink(GAME_STATE);
