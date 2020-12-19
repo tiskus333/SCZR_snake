@@ -185,24 +185,6 @@ void initProcess(void (*fun)()) {
   }
 }
 
-void readFrame(sh_m *shm_ptr, const cv::Mat &frame) {
-  // receiving data from shared memory
-  shm_ptr->receiveFromSharedMemory(frame.data, DATA_SIZE);
-}
-
-void writeFrame(sh_m *shm_ptr, const cv::Mat &frame) {
-  // writing data into shared memory
-  shm_ptr->sendToSharedMemory(frame.data, DATA_SIZE);
-}
-void readKey(sh_m *shm_ptr, unsigned char &key) {
-  // receiving data from shared memory
-  shm_ptr->receiveFromSharedMemory(&key, 1, DATA_SIZE);
-}
-void writeKey(sh_m *shm_ptr, const unsigned char &key) {
-  // writing data into shared memory
-  shm_ptr->sendToSharedMemory(&key, 1, DATA_SIZE);
-}
-
 // odczyt kamery: klatka -> pamiec wspoldzielona
 void processA() {
   std::cout << getpid() << std::endl;
@@ -216,7 +198,7 @@ void processA() {
 
   for (int i = 0; i < 3000; ++i) {
     camera >> frame;
-    writeFrame(shmp, frame);
+    shmp->writeFrame(frame);
   }
   // clear after process is finished
   shm_unlink(FRAME);
@@ -251,7 +233,7 @@ void processB() {
 
     do {
       // cap >> frame;
-      readFrame(shmp_f, frame);
+      shmp_f->readFrame(frame);
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
 
@@ -296,10 +278,7 @@ void processB() {
       }
       snake.draw(game_frame);
 
-      // std::cout<<sizeof(game_frame.elemSize() * game_frame.size().area());
-      // get frame from smh
-      // cv::imshow(window_game_name, game_frame);
-      writeFrame(shmp_g, game_frame);
+      shmp_g->writeFrame(game_frame);
 
       if (configure_options) {
         cv::createTrackbar("Low H", window_detection_name, &low_H, max_value_H,
@@ -362,7 +341,7 @@ void processC() {
   std::cout << getpid() << std::endl;
 
   while (key_pressed != 27) {
-    readFrame(shmp, frame);
+    shmp->readFrame(frame);
     cv::imshow(window_game_name, frame);
     key_pressed = cv::waitKey(1);
     // writeKey(shmp, key_pressed);

@@ -4,17 +4,17 @@
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <semaphore.h>
 #include <sys/types.h>
 #include <unistd.h>
-
-#include <semaphore.h>
 
 #include <fcntl.h>    // shared memory
 #include <sys/mman.h> //
 
+#include <algorithm>
 #include <string.h>
 
-#include <algorithm>
+#include <opencv2/core.hpp>
 
 const size_t DATA_SIZE = 640 * 480 * 3;
 
@@ -28,6 +28,10 @@ typedef struct SharedMemory {
                           const int offset = 0);
   void receiveFromSharedMemory(unsigned char *p_write_to, size_t data_size,
                                const int offset = 0);
+  void readFrame(const cv::Mat &frame);
+  void writeFrame(const cv::Mat &frame);
+  void readKey(unsigned char &key);
+  void writeKey(const unsigned char &key);
 } sh_m;
 
 void createSharedMemory(const char *path_name);

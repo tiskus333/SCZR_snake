@@ -84,3 +84,20 @@ void SharedMemory::receiveFromSharedMemory(unsigned char *p_write_to,
     exit(EXIT_FAILURE);
   }
 }
+void SharedMemory::readFrame(const cv::Mat &frame) {
+  // receiving data from shared memory
+  receiveFromSharedMemory(frame.data, DATA_SIZE);
+}
+
+void SharedMemory::writeFrame(const cv::Mat &frame) {
+  // writing data into shared memory
+  sendToSharedMemory(frame.data, DATA_SIZE);
+}
+void SharedMemory::readKey(unsigned char &key) {
+  // receiving data from shared memory
+  receiveFromSharedMemory(&key, 1, DATA_SIZE);
+}
+void SharedMemory::writeKey(const unsigned char &key) {
+  // writing data into shared memory
+  sendToSharedMemory(&key, 1, DATA_SIZE);
+}
