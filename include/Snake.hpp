@@ -34,5 +34,4 @@ public:
   bool checkIfEaten();
   void draw(cv::Mat &frame);
   bool calculateSnake(const cv::Point &point);
-  bool ifCutCircle();
 };

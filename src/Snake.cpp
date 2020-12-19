@@ -47,7 +47,19 @@ void Snake::deleteValueFromBegin() {
 cv::Point Snake::getPoint(int i) { return snakeBody[i]; }
 
 bool Snake::checkIfEaten() {
-  return /* snakeFruit.checkIfEat(snakeBody.back())  || */ ifCutCircle();
+  int dist = sectionLength.back() / snakeFruit.fruitRadius + 1;
+  int diffX =
+      (getPoint(snakeBody.size() - 1).x - getPoint(snakeBody.size() - 2).x) /
+      dist;
+  int diffY =
+      (getPoint(snakeBody.size() - 1).y - getPoint(snakeBody.size() - 2).y) /
+      dist;
+
+  for (int i = 1; i <= dist; ++i)
+    if (snakeFruit.checkIfEat(snakeBody.back() -
+                              cv::Point(diffX * i, diffY * i)))
+      return true;
+  return false;
 }
 
 void Snake::draw(cv::Mat &frame) {
@@ -104,20 +116,5 @@ bool Snake::calculateSnake(const cv::Point &point) {
       snakeFruit.generatePoint(ScreenSize);
     }
   }
-  return false;
-}
-bool Snake::ifCutCircle() {
-  int dist = sectionLength.back() / snakeFruit.fruitRadius + 1;
-  int diffX =
-      (getPoint(snakeBody.size() - 1).x - getPoint(snakeBody.size() - 2).x) /
-      dist;
-  int diffY =
-      (getPoint(snakeBody.size() - 1).y - getPoint(snakeBody.size() - 2).y) /
-      dist;
-
-  for (int i = 1; i <= dist; ++i)
-    if (snakeFruit.checkIfEat(snakeBody.back() -
-                              cv::Point(diffX * i, diffY * i)))
-      return true;
   return false;
 }
