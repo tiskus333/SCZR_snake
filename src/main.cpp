@@ -156,8 +156,6 @@ void processB() {
       }
       snake.draw(game_frame);
 
-      shmp_g->writeFrame(game_frame);
-
       if (configure_options) {
         cv::createTrackbar("Low H", window_detection_name, &low_H, max_value_H,
                            on_low_H_thresh_trackbar);
@@ -171,8 +169,10 @@ void processB() {
                            on_low_V_thresh_trackbar);
         cv::createTrackbar("High V", window_detection_name, &high_V, max_value,
                            on_high_V_thresh_trackbar);
-        cv::imshow(window_detection_name, frame_threshold);
-      }
+        shmp_g->writeFrame(frame_threshold);
+        // cv::imshow(window_detection_name, frame_threshold);
+      } else
+        shmp_g->writeFrame(game_frame);
 
       key = game_state->readKey();
       if (key == 27) {
