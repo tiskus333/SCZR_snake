@@ -101,6 +101,8 @@ void processA() {
       exit(1);
     }
     break;
+  default:
+    break;
   }
 
   cv::VideoCapture camera(0);
@@ -128,6 +130,8 @@ void processA() {
       break;
     case MEMORY_MODES::MESSEGE_QUEUE:
       msgqSendFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+      break;
+    default:
       break;
     }
   }
@@ -188,6 +192,8 @@ void processB() {
       exit(1);
     }
     break;
+  default:
+    break;
   }
 
   uchar frame_data[DATA_SIZE];
@@ -209,6 +215,8 @@ void processB() {
         break;
       case MEMORY_MODES::MESSEGE_QUEUE:
         msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+        break;
+      default:
         break;
       }
 
@@ -239,6 +247,8 @@ void processB() {
       case MEMORY_MODES::MESSEGE_QUEUE:
         msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
         break;
+      default:
+        break;
       }
 
       // game state
@@ -258,6 +268,8 @@ void processB() {
         break;
       case MEMORY_MODES::MESSEGE_QUEUE:
         msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+        break;
+      default:
         break;
       }
 
@@ -347,6 +359,8 @@ void processB() {
       case MEMORY_MODES::MESSEGE_QUEUE:
         msgqSendFrame(msgq_game, (char *)game_frame.data, DATA_SIZE);
         break;
+      default:
+        break;
       }
 
       // game state
@@ -371,6 +385,8 @@ void processB() {
         break;
       case MEMORY_MODES::MESSEGE_QUEUE:
         msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+        break;
+      default:
         break;
       }
 
@@ -404,6 +420,8 @@ void processB() {
       case MEMORY_MODES::MESSEGE_QUEUE:
         msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
         break;
+      default:
+        break;
       }
 
       // game state
@@ -433,6 +451,8 @@ void processB() {
   case MEMORY_MODES::MESSEGE_QUEUE:
     mq_close(msgq_frame);
     mq_close(msgq_game);
+    break;
+  default:
     break;
   }
   // timestamps
@@ -473,6 +493,8 @@ void processC() {
       exit(1);
     }
     break;
+  default:
+    break;
   }
 
   cv::namedWindow(window_game_name);
@@ -487,6 +509,8 @@ void processC() {
       break;
     case MEMORY_MODES::MESSEGE_QUEUE:
       msgqReceiveFrame(msgq_game, (char *)frame.data, DATA_SIZE);
+      break;
+    default:
       break;
     }
 
@@ -514,6 +538,8 @@ void processC() {
     break;
   case MEMORY_MODES::MESSEGE_QUEUE:
     mq_close(msgq_game);
+    break;
+  default:
     break;
   }
   // timestamps
@@ -602,11 +628,13 @@ int main(int argc, char *argv[]) {
       exit(EXIT_FAILURE);
     }
     break;
+  default:
+    break;
   }
 
   initProcess(processA);
-  initProcess(processB);
   initProcess(processC);
+  initProcess(processB);
 
   // timestamps
   close(pipe_a[1]);
@@ -615,7 +643,7 @@ int main(int argc, char *argv[]) {
   int64_t buff_a, buff_b[2], buff_c;
 
   // game state
-  usleep(1000);
+  usleep(100000);
   while (game_state->readKey() != 27) {
     receiveTimestamp(&buff_a, sizeof(int64_t), pipe_a[0]);
     receiveTimestamp(&buff_b[0], sizeof(int64_t), pipe_b[0]);
@@ -638,6 +666,8 @@ int main(int argc, char *argv[]) {
   case MEMORY_MODES::MESSEGE_QUEUE:
     mq_unlink(MSGQ_FRAME);
     mq_unlink(MSGQ_GAME);
+    break;
+  default:
     break;
   }
 
