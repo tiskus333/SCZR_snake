@@ -544,22 +544,33 @@ int main(int argc, char *argv[]) {
   shm_unlink(GAME_STATE);
 
   // shared memory
-  createSharedMemory(FRAME);
-  createSharedMemory(GAME);
 
   // game state
   gm_st *game_state = createSharedGameState(GAME_STATE);
 
+  createMessageQueue(MSGQ_FRAME);
+  createMessageQueue(MSGQ_GAME);
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    createSharedMemory(FRAME);
+    createSharedMemory(GAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    createPipe(pipe_frame);
+    createPipe(pipe_game);
+    break;
+  case MEMORY_MODES::MESSEGE_QUEUE:
+    break;
+  default:
+    break;
+  }
+  sleep(3);
   // pipe
   createPipe(pipe_a);
   createPipe(pipe_b);
   createPipe(pipe_c);
-  createPipe(pipe_frame);
-  createPipe(pipe_game);
 
   // message queue
-  createMessageQueue(MSGQ_FRAME);
-  createMessageQueue(MSGQ_GAME);
 
   initProcess(processA);
   initProcess(processB);
