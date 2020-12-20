@@ -53,7 +53,7 @@ static void on_high_V_thresh_trackbar(int, void *) {
 const char *FRAME = "/frame_buffer";
 const char *GAME = "/game_frame_buffer";
 // pipe
-int pipe_raw_frame[2], pipe_processed_frame[2];
+int pipe_frame[2], pipe_game[2];
 // message queue
 const char *MSGQ_FRAME = "/msgq_frame";
 const char *MSGQ_GAME = "/msgq_game";
@@ -79,7 +79,7 @@ void processA() {
   // shared memory
   sh_m *shmp = openSharedMemory(FRAME);
   // pipe
-  close(pipe_raw_frame[0]);
+  close(pipe_frame[0]);
   // message queue
   mqd_t msgq_frame = openMessageQueue(MSGQ_FRAME, O_WRONLY );
 
@@ -104,23 +104,23 @@ void processA() {
     timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::system_clock::now().time_since_epoch())
                     .count();
-    sendTimestamp(&timestamp, sizeof(timestamp), pipe_a[1]);
+    pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
 
     // SWITCH
     // shared memory
     // shmp->writeFrame(frame);
     // pipe
-    // sendFrame(frame.data, DATA_SIZE, pipe_raw_frame[1]);
+    pipeSend<unsigned char>(pipe_frame[1], frame.data, DATA_SIZE );
     // message queue
-    msgqSendFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+    // msgqSendFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
   }
 
-  sendTimestamp(&timestamp, sizeof(timestamp), pipe_a[1]);
+  pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
 
   // shared memory
   shm_unlink(FRAME);
   // pipe
-  close(pipe_raw_frame[1]);
+  close(pipe_frame[1]);
   // message queue
   mq_close(msgq_frame);
 
@@ -139,8 +139,8 @@ void processB() {
   sh_m *shmp_f = openSharedMemory(FRAME);
   sh_m *shmp_g = openSharedMemory(GAME);
   // pipe
-  close(pipe_raw_frame[1]);
-  close(pipe_processed_frame[0]);
+  close(pipe_frame[1]);
+  close(pipe_game[0]);
   // message queue
   mqd_t msgq_frame = openMessageQueue(MSGQ_FRAME, O_RDONLY);
   mqd_t msgq_game = openMessageQueue(MSGQ_GAME, O_WRONLY);
@@ -148,7 +148,6 @@ void processB() {
     perror("mq_open");
     exit(1);
   }
-  unsigned int priority;
 
   // timestamps
   close(pipe_b[0]);
@@ -173,15 +172,15 @@ void processB() {
       // shared memory
       // shmp_f->readFrame(frame);
       // pipe
-      // receiveFrame(frame.data, DATA_SIZE, pipe_raw_frame[0]);
+      pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
       // message queue
-      msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+      // msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
 
       // timestamps
       timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
-      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
       cv::flip(frame, frame, 1);
       cv::putText(frame, "Press SPACE to begin",
@@ -192,15 +191,15 @@ void processB() {
       timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
-      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
       // SWITCH
       // shared memory
       // shmp_g->writeFrame(frame);
       // pipe
-      // sendFrame(frame.data, DATA_SIZE, pipe_processed_frame[1]);
+      pipeSend<unsigned char>(pipe_game[1], frame.data, DATA_SIZE );
       // message queue
-      msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
+      // msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
 
       // game state
       key = game_state->readKey();
@@ -213,15 +212,17 @@ void processB() {
       // shared memory
       // shmp_f->readFrame(frame);
       // pipe
-      // receiveFrame(frame.data, DATA_SIZE, pipe_raw_frame[0]);
+      pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
+
       // message queue
-      msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+      //msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
 
       // timestamps
       timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
-      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
 
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
@@ -291,15 +292,16 @@ void processB() {
       timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
-      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
 
       // SWITCH
       // shared memory
       // shmp_g->writeFrame(game_frame);
       // pipe
-      // sendFrame(game_frame.data, DATA_SIZE, pipe_processed_frame[1]);
+      pipeSend<unsigned char>(pipe_game[1], game_frame.data, DATA_SIZE );
       // message queue
-      msgqSendFrame(msgq_game, (char *)game_frame.data, DATA_SIZE);
+      //msgqSendFrame(msgq_game, (char *)game_frame.data, DATA_SIZE);
 
       // game state
       key = game_state->readKey();
@@ -317,15 +319,16 @@ void processB() {
       // shared memory
       // shmp_f->readFrame(frame);
       // pipe
-      // receiveFrame(frame.data, DATA_SIZE, pipe_raw_frame[0]);
+      pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
       // message queue
-      msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+      //msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
 
       // timestamps
       timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
-      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
 
       cv::flip(frame, frame, 1);
       cv::putText(frame, "GAME OVER!",
@@ -339,15 +342,16 @@ void processB() {
       timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                       std::chrono::system_clock::now().time_since_epoch())
                       .count();
-      sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
 
       // SWITCH
       // shared memory
       // shmp_g->writeFrame(frame);
       // pipe
-      // sendFrame(frame.data, DATA_SIZE, pipe_processed_frame[1]);
+      pipeSend<unsigned char>(pipe_game[1], frame.data, DATA_SIZE );
       // message queue
-      msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
+      //msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
 
       // game state
       key = game_state->readKey();
@@ -362,14 +366,15 @@ void processB() {
 
   } while (repeat_game);
 
-  sendTimestamp(&timestamp, sizeof(timestamp), pipe_b[1]);
+  pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
 
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
   // pipe
-  close(pipe_raw_frame[0]);
-  close(pipe_processed_frame[1]);
+  close(pipe_frame[0]);
+  close(pipe_game[1]);
   // message queue
   mq_close(msgq_frame);
   mq_close(msgq_game);
@@ -386,10 +391,9 @@ void processC() {
   // shared memory
   sh_m *shmp = openSharedMemory(GAME);
   // pipe
-  close(pipe_processed_frame[1]);
+  close(pipe_game[1]);
   // message queue
   mqd_t msgq_game = openMessageQueue(MSGQ_GAME, O_RDONLY);
-  unsigned int priority;
 
   // timestamps
   close(pipe_c[0]);
@@ -407,15 +411,16 @@ void processC() {
     // shared memory
     // shmp->readFrame(frame);
     // pipe
-    // receiveFrame(frame.data, DATA_SIZE, pipe_processed_frame[0]);
+    pipeReceive<unsigned char>(pipe_game[0], frame.data, DATA_SIZE);
     // message queue
-    msgqReceiveFrame(msgq_game, (char *)frame.data, DATA_SIZE);
+    //msgqReceiveFrame(msgq_game, (char *)frame.data, DATA_SIZE);
 
     // timestamps
     timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
                     std::chrono::system_clock::now().time_since_epoch())
                     .count();
-    sendTimestamp(&timestamp, sizeof(timestamp), pipe_c[1]);
+    pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
+
 
     cv::imshow(window_game_name, frame);
     key_pressed = cv::waitKey(1);
@@ -424,12 +429,12 @@ void processC() {
     game_state->writeKey(key_pressed);
   }
 
-  sendTimestamp(&timestamp, sizeof(timestamp), pipe_c[1]);
+  pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
 
   // shared memory
   shm_unlink(GAME);
   // pipe
-  close(pipe_processed_frame[0]);
+  close(pipe_game[0]);
   // message queue
   mq_close(msgq_game);
 
@@ -480,11 +485,11 @@ int main(int argc, char *argv[]) {
     perror("Cannot create pipe.");
     exit(EXIT_FAILURE);
   }
-  if (pipe(pipe_raw_frame) == -1) {
+  if (pipe(pipe_frame) == -1) {
     perror("Cannot create pipe.");
     exit(EXIT_FAILURE);
   }
-  if (pipe(pipe_processed_frame) == -1) {
+  if (pipe(pipe_game) == -1) {
     perror("Cannot create pipe.");
     exit(EXIT_FAILURE);
   }
@@ -505,14 +510,13 @@ int main(int argc, char *argv[]) {
 
   // game state
   while (game_state->readKey() != 27) {
-    receiveTimestamp(&buff_a, sizeof(int64_t), pipe_a[0]);
-    receiveTimestamp(&buff_b[0], sizeof(int64_t), pipe_b[0]);
-    receiveTimestamp(&buff_b[1], sizeof(int64_t), pipe_b[0]);
-    receiveTimestamp(&buff_c, sizeof(int64_t), pipe_c[0]);
+    pipeReceive<int64_t>(pipe_a[0], &buff_a   , sizeof(int64_t));
+    pipeReceive<int64_t>(pipe_b[0], &buff_b[0], sizeof(int64_t));
+    pipeReceive<int64_t>(pipe_b[0], &buff_b[1], sizeof(int64_t));
+    pipeReceive<int64_t>(pipe_c[0], &buff_c   , sizeof(int64_t));
     output << buff_b[0] - buff_a << ";" << buff_c - buff_b[1] << ";"
            << buff_b[1] - buff_b[0] << ";" << buff_c - buff_a << std::endl;
   }
-  sleep(5);
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
@@ -526,6 +530,5 @@ int main(int argc, char *argv[]) {
   close(pipe_c[0]);
   // game state
   shm_unlink(GAME_STATE);
-  sleep(5);
   exit(EXIT_SUCCESS);
 }
