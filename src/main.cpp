@@ -81,11 +81,7 @@ void processA() {
   // pipe
   close(pipe_raw_frame[0]);
   // message queue
-  int msgq_frame = mq_open(MSGQ_FRAME, O_WRONLY);
-  if (msgq_frame == -1) {
-    perror("mq_open");
-    exit(1);
-  }
+  mqd_t msgq_frame = openMessageQueue(MSGQ_FRAME, O_WRONLY );
 
   // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
@@ -146,12 +142,8 @@ void processB() {
   close(pipe_raw_frame[1]);
   close(pipe_processed_frame[0]);
   // message queue
-  int msgq_frame = mq_open(MSGQ_FRAME, O_RDONLY);
-  if (msgq_frame == -1) {
-    perror("mq_open");
-    exit(1);
-  }
-  int msgq_game = mq_open(MSGQ_GAME, O_WRONLY);
+  mqd_t msgq_frame = openMessageQueue(MSGQ_FRAME, O_RDONLY);
+  mqd_t msgq_game = openMessageQueue(MSGQ_GAME, O_WRONLY);
   if (msgq_game == -1) {
     perror("mq_open");
     exit(1);
@@ -396,11 +388,7 @@ void processC() {
   // pipe
   close(pipe_processed_frame[1]);
   // message queue
-  int msgq_game = mq_open(MSGQ_GAME, O_RDONLY);
-  if (msgq_game == -1) {
-    perror("mq_open");
-    exit(1);
-  }
+  mqd_t msgq_game = openMessageQueue(MSGQ_GAME, O_RDONLY);
   unsigned int priority;
 
   // timestamps
@@ -502,29 +490,8 @@ int main(int argc, char *argv[]) {
   }
 
   // message queue
-  struct mq_attr frame;
-  frame.mq_flags = 0;
-  frame.mq_maxmsg = MSGQ_MAX_MSG;
-  frame.mq_msgsize = PAYLOAD;
-  frame.mq_curmsgs = 0;
-  mqd_t msg_q = mq_open(MSGQ_FRAME, O_CREAT | O_EXCL | O_RDWR,
-                        S_IREAD | S_IWRITE, &frame);
-  if (msg_q == -1) {
-    perror("1: Cannot create message queue");
-    exit(EXIT_FAILURE);
-  }
-
-  struct mq_attr game;
-  game.mq_flags = 0;
-  game.mq_maxmsg = MSGQ_MAX_MSG;
-  game.mq_msgsize = PAYLOAD;
-  game.mq_curmsgs = 0;
-  mqd_t msg_q2 =
-      mq_open(MSGQ_GAME, O_CREAT | O_EXCL | O_RDWR, S_IREAD | S_IWRITE, &game);
-  if (msg_q2 == -1) {
-    perror("2: Cannot create message queue");
-    exit(EXIT_FAILURE);
-  }
+  createMessageQueue(MSGQ_FRAME);
+  createMessageQueue(MSGQ_GAME);
 
   initProcess(processA);
   initProcess(processB);
@@ -544,11 +511,8 @@ int main(int argc, char *argv[]) {
     receiveTimestamp(&buff_c, sizeof(int64_t), pipe_c[0]);
     output << buff_b[0] - buff_a << ";" << buff_c - buff_b[1] << ";"
            << buff_b[1] - buff_b[0] << ";" << buff_c - buff_a << std::endl;
-    // std::cout << buff_b[0] - buff_a << " " << buff_c - buff_b[1] << " "
-    //           << buff_b[1] - buff_b[0] << " " << buff_c - buff_a <<
-    //           std::endl;
   }
-
+  sleep(5);
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
@@ -562,6 +526,6 @@ int main(int argc, char *argv[]) {
   close(pipe_c[0]);
   // game state
   shm_unlink(GAME_STATE);
-
+  sleep(5);
   exit(EXIT_SUCCESS);
 }
