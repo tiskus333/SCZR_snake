@@ -101,9 +101,7 @@ void processA() {
     camera >> frame;
 
     // timestamps
-    timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now().time_since_epoch())
-                    .count();
+    timestamp = getTimestamp();
     pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
 
     // SWITCH
@@ -177,9 +175,7 @@ void processB() {
       // msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
 
       // timestamps
-      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
+      timestamp = getTimestamp();
       pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
       cv::flip(frame, frame, 1);
@@ -188,9 +184,7 @@ void processB() {
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
 
       // timestamps
-      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
+      timestamp = getTimestamp();
       pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
       // SWITCH
@@ -218,9 +212,7 @@ void processB() {
       //msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
 
       // timestamps
-      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
+      timestamp = getTimestamp();
       pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
 
@@ -289,9 +281,7 @@ void processB() {
         }
       }
       // timestamps
-      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
+      timestamp = getTimestamp();
       pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
 
@@ -324,9 +314,7 @@ void processB() {
       //msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
 
       // timestamps
-      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
+      timestamp = getTimestamp();
       pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
 
@@ -339,9 +327,7 @@ void processB() {
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
 
       // timestamps
-      timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                      std::chrono::system_clock::now().time_since_epoch())
-                      .count();
+      timestamp = getTimestamp();
       pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
 
@@ -416,9 +402,7 @@ void processC() {
     //msgqReceiveFrame(msgq_game, (char *)frame.data, DATA_SIZE);
 
     // timestamps
-    timestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(
-                    std::chrono::system_clock::now().time_since_epoch())
-                    .count();
+    timestamp = getTimestamp();
     pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
 
 
@@ -469,30 +453,16 @@ int main(int argc, char *argv[]) {
   // shared memory
   createSharedMemory(FRAME);
   createSharedMemory(GAME);
+
   // game state
   gm_st *game_state = createSharedGameState(GAME_STATE);
 
   // pipe
-  if (pipe(pipe_a) == -1) {
-    perror("Cannot create pipe.");
-    exit(EXIT_FAILURE);
-  }
-  if (pipe(pipe_b) == -1) {
-    perror("Cannot create pipe.");
-    exit(EXIT_FAILURE);
-  }
-  if (pipe(pipe_c) == -1) {
-    perror("Cannot create pipe.");
-    exit(EXIT_FAILURE);
-  }
-  if (pipe(pipe_frame) == -1) {
-    perror("Cannot create pipe.");
-    exit(EXIT_FAILURE);
-  }
-  if (pipe(pipe_game) == -1) {
-    perror("Cannot create pipe.");
-    exit(EXIT_FAILURE);
-  }
+  createPipe(pipe_a);
+  createPipe(pipe_b);
+  createPipe(pipe_c);
+  createPipe(pipe_frame);
+  createPipe(pipe_game);
 
   // message queue
   createMessageQueue(MSGQ_FRAME);
