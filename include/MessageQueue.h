@@ -15,9 +15,6 @@ const long MSGQ_MAX_MSG = 10;       // maximum 10
 
 const long PAYLOAD = 4096;
 
-void createMessageQueue(const char *msgq_file_name);
-mqd_t openMessageQueue(const char *msgq_file_name, const int flag);
-
 void msgqSendFrame(int msgq_des, char *p_data, const size_t data_size);
 void msgqReceiveFrame(int msgq_des, char *p_data, const size_t data_size);
 
