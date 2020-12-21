@@ -10,12 +10,10 @@ MessageQueue::MessageQueue() {
 void MessageQueue::create(const char *msgq_file_name) {
   msgq_des_ = mq_open(msgq_file_name, O_CREAT | O_EXCL | O_RDWR,
                         S_IREAD | S_IWRITE, &attributes_);
-  std::cout << "in create: " << msgq_file_name << std::endl;
   if (msgq_des_ == -1) {
     perror("Cannot create message queue");
     exit(EXIT_FAILURE);
   }
-  std::cout << "created: " << msgq_file_name << std::endl;
 }
 
 void MessageQueue::open(const char *msgq_file_name, const int flag) {
@@ -24,6 +22,10 @@ void MessageQueue::open(const char *msgq_file_name, const int flag) {
     perror("Cannot open message queue");
     exit(1);
   }
+}
+
+void MessageQueue::close() {
+  mq_close(msgq_des_);
 }
 
 void MessageQueue::sendFrame(char *p_data, const size_t data_size) {

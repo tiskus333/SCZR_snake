@@ -63,7 +63,7 @@ int pipe_a[2], pipe_b[2], pipe_c[2];
 // game state
 const char *GAME_STATE = "/game_state";
 
-enum class MEMORY_MODES { SHARED_MEMORY, PIPE, MESSEGE_QUEUE };
+enum class MEMORY_MODES { SHARED_MEMORY, PIPE, MESSAGE_QUEUE };
 MEMORY_MODES mode = MEMORY_MODES::SHARED_MEMORY;
 
 void initProcess(void (*fun)()) {
@@ -76,13 +76,23 @@ void initProcess(void (*fun)()) {
 // odczyt kamery: klatka -> pamiec wspoldzielona
 void processA() {
   std::cout << "A: " << getpid() << std::endl;
+  
+  sh_m *shmp;
+  MessageQueue msgq_frame;
 
-  // shared memory
-  sh_m *shmp = openSharedMemory(FRAME);
-  // pipe
-  close(pipe_frame[0]);
-  // message queue
-  mqd_t msgq_frame = openMessageQueue(MSGQ_FRAME, O_WRONLY);
+  switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shmp = openSharedMemory(FRAME);
+      break;
+    case MEMORY_MODES::PIPE:
+      close(pipe_frame[0]);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_frame.open(MSGQ_FRAME, O_WRONLY);
+      break;
+    default:
+      break;
+  }
 
   // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
@@ -113,18 +123,12 @@ void processA() {
     case MEMORY_MODES::PIPE:
       pipeSend<unsigned char>(pipe_frame[1], frame.data, DATA_SIZE);
       break;
-    case MEMORY_MODES::MESSEGE_QUEUE:
-      msgqSendFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_frame.sendFrame((char *)frame.data, DATA_SIZE);
       break;
     default:
       break;
     }
-    // shared memory
-
-    // pipe
-    //
-    // message queue
-    //
   }
 
   pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
@@ -134,7 +138,7 @@ void processA() {
   // pipe
   close(pipe_frame[1]);
   // message queue
-  mq_close(msgq_frame);
+  msgq_frame.close();
 
   // timestamps
   close(pipe_a[1]);
@@ -146,19 +150,23 @@ void processA() {
 
 void processB() {
   std::cout << "B: " << getpid() << std::endl;
-
-  // shared memory
-  sh_m *shmp_f = openSharedMemory(FRAME);
-  sh_m *shmp_g = openSharedMemory(GAME);
-  // pipe
-  close(pipe_frame[1]);
-  close(pipe_game[0]);
-  // message queue
-  mqd_t msgq_frame = openMessageQueue(MSGQ_FRAME, O_RDONLY);
-  mqd_t msgq_game = openMessageQueue(MSGQ_GAME, O_WRONLY);
-  if (msgq_game == -1) {
-    perror("mq_open");
-    exit(1);
+  sh_m *shmp_f, *shmp_g;
+  MessageQueue msgq_frame, msgq_game;
+  switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shmp_f = openSharedMemory(FRAME);
+      shmp_g = openSharedMemory(GAME);
+      break;
+    case MEMORY_MODES::PIPE:
+      close(pipe_frame[1]);
+      close(pipe_game[0]);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_frame.open(MSGQ_FRAME, O_RDONLY);
+      msgq_game.open(MSGQ_GAME, O_WRONLY);
+      break;
+    default:
+      break;
   }
 
   // timestamps
@@ -188,8 +196,8 @@ void processB() {
       case MEMORY_MODES::PIPE:
         pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
         break;
-      case MEMORY_MODES::MESSEGE_QUEUE:
-        msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_frame.receiveFrame((char *)frame.data, DATA_SIZE );
         break;
       default:
         break;
@@ -216,18 +224,12 @@ void processB() {
       case MEMORY_MODES::PIPE:
         pipeSend<unsigned char>(pipe_game[1], frame.data, DATA_SIZE);
         break;
-      case MEMORY_MODES::MESSEGE_QUEUE:
-        msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
-        break;
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_game.sendFrame((char *)frame.data, DATA_SIZE);
+        break; 
       default:
         break;
       }
-      // shared memory
-
-      // pipe
-      //
-      // message queue
-      //
 
       // game state
       key = game_state->readKey();
@@ -244,19 +246,12 @@ void processB() {
       case MEMORY_MODES::PIPE:
         pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
         break;
-      case MEMORY_MODES::MESSEGE_QUEUE:
-        msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_frame.receiveFrame((char *)frame.data, DATA_SIZE );
         break;
       default:
         break;
       }
-      // shared memory
-
-      // pipe
-      //
-
-      // message queue
-      //
 
       // timestamps
       timestamp = getTimestamp();
@@ -338,18 +333,12 @@ void processB() {
       case MEMORY_MODES::PIPE:
         pipeSend<unsigned char>(pipe_game[1], game_frame.data, DATA_SIZE);
         break;
-      case MEMORY_MODES::MESSEGE_QUEUE:
-        msgqSendFrame(msgq_game, (char *)game_frame.data, DATA_SIZE);
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_game.sendFrame((char *)game_frame.data, DATA_SIZE);
         break;
       default:
         break;
       }
-      // shared memory
-
-      // pipe
-      //
-      // message queue
-      //
 
       // game state
       key = game_state->readKey();
@@ -371,18 +360,12 @@ void processB() {
       case MEMORY_MODES::PIPE:
         pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
         break;
-      case MEMORY_MODES::MESSEGE_QUEUE:
-        msgqReceiveFrame(msgq_frame, (char *)frame.data, DATA_SIZE);
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_frame.receiveFrame((char *)frame.data, DATA_SIZE );
         break;
       default:
         break;
       }
-      // shared memory
-
-      // pipe
-      //
-      // message queue
-      //
 
       // timestamps
       timestamp = getTimestamp();
@@ -408,8 +391,8 @@ void processB() {
       case MEMORY_MODES::PIPE:
         pipeSend<unsigned char>(pipe_game[1], frame.data, DATA_SIZE);
         break;
-      case MEMORY_MODES::MESSEGE_QUEUE:
-        msgqSendFrame(msgq_game, (char *)frame.data, DATA_SIZE);
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_game.sendFrame((char *)frame.data, DATA_SIZE);
         break;
       default:
         break;
@@ -437,8 +420,8 @@ void processB() {
   close(pipe_frame[0]);
   close(pipe_game[1]);
   // message queue
-  mq_close(msgq_frame);
-  mq_close(msgq_game);
+  msgq_frame.close();
+  msgq_game.close();
 
   // timestamps
   close(pipe_b[1]);
@@ -448,13 +431,23 @@ void processB() {
 
 void processC() {
   std::cout << "C: " << getpid() << std::endl;
+  
+  sh_m *shmp;
+  MessageQueue msgq_game;
 
-  // shared memory
-  sh_m *shmp = openSharedMemory(GAME);
-  // pipe
-  close(pipe_game[1]);
-  // message queue
-  mqd_t msgq_game = openMessageQueue(MSGQ_GAME, O_RDONLY);
+  switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shmp = openSharedMemory(GAME);
+      break;
+    case MEMORY_MODES::PIPE:
+      close(pipe_game[1]);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_game.open(MSGQ_GAME, O_RDONLY);
+      break;
+    default:
+      break;
+  }
 
   // timestamps
   close(pipe_c[0]);
@@ -476,18 +469,12 @@ void processC() {
     case MEMORY_MODES::PIPE:
       pipeReceive<unsigned char>(pipe_game[0], frame.data, DATA_SIZE);
       break;
-    case MEMORY_MODES::MESSEGE_QUEUE:
-      msgqReceiveFrame(msgq_game, (char *)frame.data, DATA_SIZE);
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_game.receiveFrame((char *)frame.data, DATA_SIZE);
       break;
     default:
       break;
     }
-    // shared memory
-
-    // pipe
-    //
-    // message queue
-    //
 
     // timestamps
     timestamp = getTimestamp();
@@ -507,7 +494,7 @@ void processC() {
   // pipe
   close(pipe_game[0]);
   // message queue
-  mq_close(msgq_game);
+  msgq_game.close();
 
   // timestamps
   close(pipe_c[1]);
@@ -519,15 +506,22 @@ int main(int argc, char *argv[]) {
   std::cout << "M: " << getpid() << std::endl;
   // unlink from shared memory object if still exists
   mode = MEMORY_MODES::SHARED_MEMORY;
+  std::string ipc_mode = "SHARED_MEMORY";
   if (argc == 2) {
     const std::string val = argv[1];
-    if (val == "pipe")
+    if (val == "pipes") {
       mode = MEMORY_MODES::PIPE;
-    if (val == "msgq")
-      mode = MEMORY_MODES::MESSEGE_QUEUE;
+      ipc_mode = "PIPES";
+    }
+    if (val == "msgq") {
+      mode = MEMORY_MODES::MESSAGE_QUEUE;
+      ipc_mode = "MESSAGE_QUEUE";
+    }
   }
-  // std::ofstream output("wyniki/SMH.txt");
-
+  std::cout << "USING MODE: " << ipc_mode << std::endl
+            << "M: " << getpid() << std::endl;
+  std::ofstream output("wyniki/"+ipc_mode+".txt");
+  
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
@@ -551,8 +545,7 @@ int main(int argc, char *argv[]) {
     createPipe(pipe_frame);
     createPipe(pipe_game);
     break;
-  case MEMORY_MODES::MESSEGE_QUEUE:
-    std::cout << "in case message queue\n";
+  case MEMORY_MODES::MESSAGE_QUEUE:
     frame.create(MSGQ_FRAME);
     game.create(MSGQ_GAME);
     break;
@@ -580,9 +573,10 @@ int main(int argc, char *argv[]) {
     pipeReceive<int64_t>(pipe_b[0], &buff_b[0], sizeof(int64_t));
     pipeReceive<int64_t>(pipe_b[0], &buff_b[1], sizeof(int64_t));
     pipeReceive<int64_t>(pipe_c[0], &buff_c, sizeof(int64_t));
-    // output << buff_b[0] - buff_a << ";" << buff_c - buff_b[1] << ";"
-    //        << buff_b[1] - buff_b[0] << ";" << buff_c - buff_a << std::endl;
+    output << buff_b[0] - buff_a << ";" << buff_c - buff_b[1] << ";"
+           << buff_b[1] - buff_b[0] << ";" << buff_c - buff_a << std::endl;
   }
+
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);

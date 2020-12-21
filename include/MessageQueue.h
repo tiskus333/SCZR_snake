@@ -27,6 +27,7 @@ class MessageQueue {
   MessageQueue();
   void create(const char *msgq_file_name);
   void open(const char *msgq_file_name, const int flag);
+  void close();
 
   void sendFrame(char *p_data, const size_t data_size);
   void receiveFrame(char *p_data, const size_t data_size);
