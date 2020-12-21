@@ -1,3 +1,4 @@
+#include "Benchmark.hpp"
 #include "Snake.hpp"
 #include <iostream>
 #include <opencv2/highgui.hpp>
@@ -74,6 +75,8 @@ int main() {
 
     do {
       cap >> frame;
+      // Benchmark<std::chrono::microseconds> im_proc;
+
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
 
@@ -109,14 +112,17 @@ int main() {
         std::sort(
             circles.begin(), circles.end(),
             [](const auto &x, const auto &y) { return y.second < x.second; });
-
         cv::circle(game_frame, circles[0].first, circles[0].second,
                    {255, 0, 0});
         cv::circle(game_frame, circles[0].first, 1, {0, 0, 255});
-        if (!is_paused)
-          end_game = snake.calculateSnake(circles[0].first);
+      }
+      // std::cout << im_proc.elapsed() << ';';
+      // Benchmark<std::chrono::microseconds> snakeProc;
+      if (!is_paused && circles.size() > 0) {
+        end_game = snake.calculateSnake(circles[0].first);
       }
       snake.draw(game_frame);
+      // std::cout << snakeProc.elapsed() << std::endl;
 
       // std::cout<<sizeof(game_frame.elemSize() * game_frame.size().area());
       // get frame from smh
