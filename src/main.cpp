@@ -414,12 +414,6 @@ void processB() {
       default:
         break;
       }
-      // shared memory
-
-      // pipe
-      //
-      // message queue
-      //
 
       // game state
       key = game_state->readKey();
@@ -525,8 +519,8 @@ int main(int argc, char *argv[]) {
   std::cout << "M: " << getpid() << std::endl;
   // unlink from shared memory object if still exists
   mode = MEMORY_MODES::SHARED_MEMORY;
-  if (argc == 3) {
-    const std::string val = argv[2];
+  if (argc == 2) {
+    const std::string val = argv[1];
     if (val == "pipe")
       mode = MEMORY_MODES::PIPE;
     if (val == "msgq")
@@ -543,13 +537,11 @@ int main(int argc, char *argv[]) {
   // game state
   shm_unlink(GAME_STATE);
 
-  // shared memory
-
   // game state
   gm_st *game_state = createSharedGameState(GAME_STATE);
 
-  createMessageQueue(MSGQ_FRAME);
-  createMessageQueue(MSGQ_GAME);
+  MessageQueue frame, game;
+
   switch (mode) {
   case MEMORY_MODES::SHARED_MEMORY:
     createSharedMemory(FRAME);
@@ -560,17 +552,17 @@ int main(int argc, char *argv[]) {
     createPipe(pipe_game);
     break;
   case MEMORY_MODES::MESSEGE_QUEUE:
+    std::cout << "in case message queue\n";
+    frame.create(MSGQ_FRAME);
+    game.create(MSGQ_GAME);
     break;
   default:
     break;
   }
-  sleep(3);
   // pipe
   createPipe(pipe_a);
   createPipe(pipe_b);
   createPipe(pipe_c);
-
-  // message queue
 
   initProcess(processA);
   initProcess(processB);
