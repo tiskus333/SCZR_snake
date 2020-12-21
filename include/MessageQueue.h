@@ -16,7 +16,7 @@
 class MessageQueue {
   mqd_t msgq_des_;
   struct mq_attr attributes_;
-  struct timespec timeout;
+  struct timespec timeout_;
 
   // constants
   const long PAYLOAD_SIZE = 4096;

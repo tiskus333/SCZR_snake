@@ -31,11 +31,11 @@ void MessageQueue::close() {
 void MessageQueue::sendFrame(char *p_data, const size_t data_size) {
   size_t i = 0;
 
-  clock_gettime(CLOCK_REALTIME, &timeout);
-  timeout.tv_sec += TIMEOUT;
+  clock_gettime(CLOCK_REALTIME, &timeout_);
+  timeout_.tv_sec += TIMEOUT;
 
   for (; i < data_size / PAYLOAD_SIZE; ++i) {
-    if (mq_timedsend(msgq_des_, p_data + i * PAYLOAD_SIZE, PAYLOAD_SIZE, 1, &timeout) == -1) {
+    if (mq_timedsend(msgq_des_, p_data + i * PAYLOAD_SIZE, PAYLOAD_SIZE, 1, &timeout_) == -1) {
       perror("mq_send");
       exit(1);
     }
@@ -46,11 +46,11 @@ void MessageQueue::receiveFrame(char *p_data, const size_t data_size) {
   size_t i = 0;
   uint priority;
 
-  clock_gettime(CLOCK_REALTIME, &timeout);
-  timeout.tv_sec += TIMEOUT;
+  clock_gettime(CLOCK_REALTIME, &timeout_);
+  timeout_.tv_sec += TIMEOUT;
 
   for (; i < data_size / PAYLOAD_SIZE; ++i) {
-    if (mq_timedreceive(msgq_des_, p_data + i * PAYLOAD_SIZE, PAYLOAD_SIZE, &priority, &timeout) == -1) {
+    if (mq_timedreceive(msgq_des_, p_data + i * PAYLOAD_SIZE, PAYLOAD_SIZE, &priority, &timeout_) == -1) {
       perror("mq_receive");
       exit(1);
     }

@@ -133,12 +133,19 @@ void processA() {
 
   pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
 
-  // shared memory
-  shm_unlink(FRAME);
-  // pipe
-  close(pipe_frame[1]);
-  // message queue
-  msgq_frame.close();
+  switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shm_unlink(FRAME);
+      break;
+    case MEMORY_MODES::PIPE:
+      close(pipe_frame[1]);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_frame.close();
+      break;
+    default:
+      break;
+  }
 
   // timestamps
   close(pipe_a[1]);
@@ -413,16 +420,23 @@ void processB() {
 
   pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
-  // shared memory
-  shm_unlink(FRAME);
-  shm_unlink(GAME);
-  // pipe
-  close(pipe_frame[0]);
-  close(pipe_game[1]);
-  // message queue
-  msgq_frame.close();
-  msgq_game.close();
-
+  switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shm_unlink(FRAME);
+      shm_unlink(GAME);
+      break;
+    case MEMORY_MODES::PIPE:
+      close(pipe_frame[0]);
+      close(pipe_game[1]);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_frame.close();
+      msgq_game.close();
+      break;
+    default:
+      break;
+  }
+  
   // timestamps
   close(pipe_b[1]);
   // game state
@@ -489,12 +503,19 @@ void processC() {
 
   pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
 
-  // shared memory
-  shm_unlink(GAME);
-  // pipe
-  close(pipe_game[0]);
-  // message queue
-  msgq_game.close();
+  switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shm_unlink(GAME);
+      break;
+    case MEMORY_MODES::PIPE:
+      close(pipe_game[0]);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_game.close();
+      break;
+    default:
+      break;
+  }
 
   // timestamps
   close(pipe_c[1]);

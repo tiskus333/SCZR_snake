@@ -17,7 +17,6 @@
 #include <opencv2/core.hpp>
 
 const size_t DATA_SIZE = 640 * 480 * 3;
-const long HALF_DATA_SIZE = 450; 
 
 typedef struct SharedFrame {
   sem_t sem_read;
