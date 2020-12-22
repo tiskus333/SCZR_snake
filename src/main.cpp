@@ -1,6 +1,9 @@
-
+#include "MessageQueue.h"
+#include "Pipe.h"
 #include "SharedMemory.hpp"
 #include "Snake.hpp"
+
+#include <fstream>
 #include <iostream>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
@@ -46,10 +49,22 @@ static void on_high_V_thresh_trackbar(int, void *) {
   cv::setTrackbarPos("High V", window_detection_name, high_V);
 }
 
+// shared memory
 const char *FRAME = "/frame_buffer";
 const char *GAME = "/game_frame_buffer";
+// pipe
+int pipe_frame[2], pipe_game[2];
+// message queue
+const char *MSGQ_FRAME = "/msgq_frame";
+const char *MSGQ_GAME = "/msgq_game";
+
+// timestamps
+int pipe_a[2], pipe_b[2], pipe_c[2];
+// game state
 const char *GAME_STATE = "/game_state";
-enum class MEMORY_MODES { SHARED_MEMORY, PIPE, MESSEGE_QUEUE };
+
+enum class MEMORY_MODES { SHARED_MEMORY, PIPE, MESSAGE_QUEUE };
+MEMORY_MODES mode = MEMORY_MODES::SHARED_MEMORY;
 
 void initProcess(void (*fun)()) {
   if (fork() == 0) {
@@ -61,8 +76,29 @@ void initProcess(void (*fun)()) {
 // odczyt kamery: klatka -> pamiec wspoldzielona
 void processA() {
   std::cout << "A: " << getpid() << std::endl;
-  sh_m *shmp = openSharedMemory(FRAME);
+
+  sh_m *shmp;
+  MessageQueue msgq_frame;
+
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    shmp = openSharedMemory(FRAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    close(pipe_frame[0]);
+    break;
+  case MEMORY_MODES::MESSAGE_QUEUE:
+    msgq_frame.open(MSGQ_FRAME, O_WRONLY);
+    break;
+  default:
+    break;
+  }
+
+  // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
+  // timestamps
+  close(pipe_a[0]);
+  int64_t timestamp;
 
   cv::Mat frame;
   cv::VideoCapture camera(0);
@@ -71,20 +107,79 @@ void processA() {
   camera.set(cv::CAP_PROP_FRAME_WIDTH, GAME_SIZE_X);
   camera.set(cv::CAP_PROP_FRAME_HEIGHT, GAME_SIZE_Y);
 
+  // game state
   while (game_state->readKey() != 27) {
     camera >> frame;
-    shmp->writeFrame(frame);
+
+    // timestamps
+    timestamp = getTimestamp();
+    pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
+
+    // SWITCH
+    switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shmp->writeFrame(frame);
+      break;
+    case MEMORY_MODES::PIPE:
+      pipeSend<unsigned char>(pipe_frame[1], frame.data, DATA_SIZE);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_frame.sendFrame((char *)frame.data, DATA_SIZE);
+      break;
+    default:
+      break;
+    }
   }
-  // clear after process is finished
-  shm_unlink(FRAME);
+
+  pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
+
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    shm_unlink(FRAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    close(pipe_frame[1]);
+    break;
+  case MEMORY_MODES::MESSAGE_QUEUE:
+    msgq_frame.close();
+    break;
+  default:
+    break;
+  }
+
+  // timestamps
+  close(pipe_a[1]);
+  // game state
   shm_unlink(GAME_STATE);
+
   camera.release();
 }
 
 void processB() {
   std::cout << "B: " << getpid() << std::endl;
-  sh_m *shmp_f = openSharedMemory(FRAME);
-  sh_m *shmp_g = openSharedMemory(GAME);
+  sh_m *shmp_f, *shmp_g;
+  MessageQueue msgq_frame, msgq_game;
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    shmp_f = openSharedMemory(FRAME);
+    shmp_g = openSharedMemory(GAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    close(pipe_frame[1]);
+    close(pipe_game[0]);
+    break;
+  case MEMORY_MODES::MESSAGE_QUEUE:
+    msgq_frame.open(MSGQ_FRAME, O_RDONLY);
+    msgq_game.open(MSGQ_GAME, O_WRONLY);
+    break;
+  default:
+    break;
+  }
+
+  // timestamps
+  close(pipe_b[0]);
+  int64_t timestamp;
+  // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
 
   uchar frame_data[DATA_SIZE];
@@ -100,19 +195,75 @@ void processB() {
   do {
     Snake snake({GAME_SIZE_X, GAME_SIZE_Y});
     do {
-      shmp_f->readFrame(frame);
+      // SWITCH
+      switch (mode) {
+      case MEMORY_MODES::SHARED_MEMORY:
+        shmp_f->readFrame(frame);
+        break;
+      case MEMORY_MODES::PIPE:
+        pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
+        break;
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_frame.receiveFrame((char *)frame.data, DATA_SIZE);
+        break;
+      default:
+        break;
+      }
+
+      // timestamps
+      timestamp = getTimestamp();
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
       cv::flip(frame, frame, 1);
       cv::putText(frame, "Press SPACE to begin",
                   {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
-      shmp_g->writeFrame(frame);
+
+      // timestamps
+      timestamp = getTimestamp();
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
+      // SWITCH
+      switch (mode) {
+      case MEMORY_MODES::SHARED_MEMORY:
+        shmp_g->writeFrame(frame);
+        break;
+      case MEMORY_MODES::PIPE:
+        pipeSend<unsigned char>(pipe_game[1], frame.data, DATA_SIZE);
+        break;
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_game.sendFrame((char *)frame.data, DATA_SIZE);
+        break;
+      default:
+        break;
+      }
+
+      // game state
       key = game_state->readKey();
       if (key == 27)
         return;
     } while (key != ' ');
 
     do {
-      shmp_f->readFrame(frame);
+      // SWITCH
+      switch (mode) {
+      case MEMORY_MODES::SHARED_MEMORY:
+        shmp_f->readFrame(frame);
+        break;
+      case MEMORY_MODES::PIPE:
+        pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
+        break;
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_frame.receiveFrame((char *)frame.data, DATA_SIZE);
+        break;
+      default:
+        break;
+      }
+
+      // timestamps
+      timestamp = getTimestamp();
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
 
@@ -170,7 +321,6 @@ void processB() {
                            on_low_V_thresh_trackbar);
         cv::createTrackbar("High V", window_detection_name, &high_V, max_value,
                            on_high_V_thresh_trackbar);
-        // shmp_g->writeFrame(frame_threshold);
         cv::imshow(window_detection_name, frame_threshold);
         if (cv::waitKey(1) == 'o') {
           is_paused = false;
@@ -178,8 +328,26 @@ void processB() {
           cv::destroyWindow(window_detection_name);
         }
       }
-      shmp_g->writeFrame(game_frame);
+      // timestamps
+      timestamp = getTimestamp();
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
 
+      // SWITCH
+      switch (mode) {
+      case MEMORY_MODES::SHARED_MEMORY:
+        shmp_g->writeFrame(game_frame);
+        break;
+      case MEMORY_MODES::PIPE:
+        pipeSend<unsigned char>(pipe_game[1], game_frame.data, DATA_SIZE);
+        break;
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_game.sendFrame((char *)game_frame.data, DATA_SIZE);
+        break;
+      default:
+        break;
+      }
+
+      // game state
       key = game_state->readKey();
       if (key == 27) {
         return;
@@ -191,7 +359,25 @@ void processB() {
     } while (!end_game);
 
     do {
-      shmp_f->readFrame(frame);
+      // SWITCH
+      switch (mode) {
+      case MEMORY_MODES::SHARED_MEMORY:
+        shmp_f->readFrame(frame);
+        break;
+      case MEMORY_MODES::PIPE:
+        pipeReceive<unsigned char>(pipe_frame[0], frame.data, DATA_SIZE);
+        break;
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_frame.receiveFrame((char *)frame.data, DATA_SIZE);
+        break;
+      default:
+        break;
+      }
+
+      // timestamps
+      timestamp = getTimestamp();
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
       cv::flip(frame, frame, 1);
       cv::putText(frame, "GAME OVER!",
                   {GAME_SIZE_X / 2 - 75, GAME_SIZE_Y / 2 - 50},
@@ -199,26 +385,88 @@ void processB() {
       cv::putText(frame, "Press SPACE to reset",
                   {GAME_SIZE_X / 2 - 150, GAME_SIZE_Y / 2 - 20},
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
-      shmp_g->writeFrame(frame);
 
+      // timestamps
+      timestamp = getTimestamp();
+      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
+      // SWITCH
+      switch (mode) {
+      case MEMORY_MODES::SHARED_MEMORY:
+        shmp_g->writeFrame(frame);
+        break;
+      case MEMORY_MODES::PIPE:
+        pipeSend<unsigned char>(pipe_game[1], frame.data, DATA_SIZE);
+        break;
+      case MEMORY_MODES::MESSAGE_QUEUE:
+        msgq_game.sendFrame((char *)frame.data, DATA_SIZE);
+        break;
+      default:
+        break;
+      }
+
+      // game state
       key = game_state->readKey();
       if (key == ' ')
         repeat_game = true;
       if (key == 27) {
         end_game = true;
         repeat_game = false;
+        key = ' ';
       }
     } while (key != ' ');
 
   } while (repeat_game);
-  shm_unlink(FRAME);
-  shm_unlink(GAME);
+
+  pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    shm_unlink(FRAME);
+    shm_unlink(GAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    close(pipe_frame[0]);
+    close(pipe_game[1]);
+    break;
+  case MEMORY_MODES::MESSAGE_QUEUE:
+    msgq_frame.close();
+    msgq_game.close();
+    break;
+  default:
+    break;
+  }
+
+  // timestamps
+  close(pipe_b[1]);
+  // game state
   shm_unlink(GAME_STATE);
 }
 
 void processC() {
   std::cout << "C: " << getpid() << std::endl;
-  sh_m *shmp = openSharedMemory(GAME);
+
+  sh_m *shmp;
+  MessageQueue msgq_game;
+
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    shmp = openSharedMemory(GAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    close(pipe_game[1]);
+    break;
+  case MEMORY_MODES::MESSAGE_QUEUE:
+    msgq_game.open(MSGQ_GAME, O_RDONLY);
+    break;
+  default:
+    break;
+  }
+
+  // timestamps
+  close(pipe_c[0]);
+  int64_t timestamp;
+  // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
 
   uchar frame_data[DATA_SIZE];
@@ -227,48 +475,143 @@ void processC() {
   cv::namedWindow(window_game_name);
 
   while (key_pressed != 27) {
-    shmp->readFrame(frame);
+    // SWITCH
+    switch (mode) {
+    case MEMORY_MODES::SHARED_MEMORY:
+      shmp->readFrame(frame);
+      break;
+    case MEMORY_MODES::PIPE:
+      pipeReceive<unsigned char>(pipe_game[0], frame.data, DATA_SIZE);
+      break;
+    case MEMORY_MODES::MESSAGE_QUEUE:
+      msgq_game.receiveFrame((char *)frame.data, DATA_SIZE);
+      break;
+    default:
+      break;
+    }
+
+    // timestamps
+    timestamp = getTimestamp();
+    pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
+
     cv::imshow(window_game_name, frame);
     key_pressed = cv::waitKey(1);
+
+    // game state
     game_state->writeKey(key_pressed);
-    // shmp->writeKey(key_pressed);
   }
-  // clear after process is finished
-  shm_unlink(GAME);
+
+  pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
+
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    shm_unlink(GAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    close(pipe_game[0]);
+    break;
+  case MEMORY_MODES::MESSAGE_QUEUE:
+    msgq_game.close();
+    break;
+  default:
+    break;
+  }
+
+  // timestamps
+  close(pipe_c[1]);
+  // game state
   shm_unlink(GAME_STATE);
 }
 
 int main(int argc, char *argv[]) {
   std::cout << "M: " << getpid() << std::endl;
   // unlink from shared memory object if still exists
-  MEMORY_MODES mode = MEMORY_MODES::SHARED_MEMORY;
-  if (argc == 3) {
-    const std::string val = argv[2];
-    if (val == "pipe")
+  mode = MEMORY_MODES::SHARED_MEMORY;
+  std::string ipc_mode = "SHARED_MEMORY";
+  if (argc == 2) {
+    const std::string val = argv[1];
+    if (val == "pipes") {
       mode = MEMORY_MODES::PIPE;
-    if (val == "msgq")
-      mode = MEMORY_MODES::MESSEGE_QUEUE;
+      ipc_mode = "PIPES";
+    }
+    if (val == "msgq") {
+      mode = MEMORY_MODES::MESSAGE_QUEUE;
+      ipc_mode = "MESSAGE_QUEUE";
+    }
   }
+  std::cout << "USING MODE: " << ipc_mode << std::endl
+            << "M: " << getpid() << std::endl;
+  std::ofstream output("wyniki/" + ipc_mode + ".txt");
 
+  // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
+  // message queue
+  mq_unlink(MSGQ_FRAME);
+  mq_unlink(MSGQ_GAME);
+  // game state
   shm_unlink(GAME_STATE);
 
-  createSharedMemory(FRAME);
-  createSharedMemory(GAME);
-
+  // game state
   gm_st *game_state = createSharedGameState(GAME_STATE);
+
+  MessageQueue frame, game;
+
+  switch (mode) {
+  case MEMORY_MODES::SHARED_MEMORY:
+    createSharedMemory(FRAME);
+    createSharedMemory(GAME);
+    break;
+  case MEMORY_MODES::PIPE:
+    createPipe(pipe_frame);
+    createPipe(pipe_game);
+    break;
+  case MEMORY_MODES::MESSAGE_QUEUE:
+    frame.create(MSGQ_FRAME);
+    game.create(MSGQ_GAME);
+    break;
+  default:
+    break;
+  }
+  // pipe
+  createPipe(pipe_a);
+  createPipe(pipe_b);
+  createPipe(pipe_c);
 
   initProcess(processA);
   initProcess(processB);
   initProcess(processC);
-  // unlink from shared memory object
 
+  // timestamps
+  close(pipe_a[1]);
+  close(pipe_b[1]);
+  close(pipe_c[1]);
+  int64_t buff_a, buff_b[2], buff_c, prev_frame;
+
+  prev_frame = getTimestamp();
   while (game_state->readKey() != 27) {
+    pipeReceive<int64_t>(pipe_a[0], &buff_a, sizeof(int64_t));
+    pipeReceive<int64_t>(pipe_b[0], &buff_b[0], sizeof(int64_t));
+    pipeReceive<int64_t>(pipe_b[0], &buff_b[1], sizeof(int64_t));
+    pipeReceive<int64_t>(pipe_c[0], &buff_c, sizeof(int64_t));
+    output << (buff_b[0] - buff_a) / 1000 << ';' << (buff_c - buff_b[1]) / 1000
+           << ';' << (buff_b[1] - buff_b[0]) / 1000 << ';'
+           << (buff_c - buff_a) / 1000 << ';' << (buff_c - prev_frame) / 1000
+           << '\n';
+    prev_frame = buff_c;
   }
-
+  // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
+  // message queue
+  mq_unlink(MSGQ_FRAME);
+  mq_unlink(MSGQ_GAME);
+
+  // timestamps
+  close(pipe_a[0]);
+  close(pipe_b[0]);
+  close(pipe_c[0]);
+  // game state
   shm_unlink(GAME_STATE);
   exit(EXIT_SUCCESS);
 }
