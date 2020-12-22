@@ -594,9 +594,9 @@ int main(int argc, char *argv[]) {
     pipeReceive<int64_t>(pipe_b[0], &buff_b[0], sizeof(int64_t));
     pipeReceive<int64_t>(pipe_b[0], &buff_b[1], sizeof(int64_t));
     pipeReceive<int64_t>(pipe_c[0], &buff_c, sizeof(int64_t));
-    output << (buff_b[0] - buff_a) / 1000 << ";" << (buff_c - buff_b[1]) / 1000
-           << ";" << (buff_b[1] - buff_b[0]) / 1000 << ";"
-           << (buff_c - buff_a) / 1000 << ";" << (buff_c - prev_frame) / 1000
+    output << (buff_b[0] - buff_a) / 1000 << ';' << (buff_c - buff_b[1]) / 1000
+           << ';' << (buff_b[1] - buff_b[0]) / 1000 << ';'
+           << (buff_c - buff_a) / 1000 << ';' << (buff_c - prev_frame) / 1000
            << '\n';
     prev_frame = buff_c;
   }
