@@ -11,8 +11,8 @@
 #include <string.h>
 
 #include <sched.h>
-#include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/time.h>
 
 bool is_paused = false;
 bool repeat_game = false;
@@ -79,9 +79,9 @@ void initProcess(void (*fun)()) {
 
 // odczyt kamery: klatka -> pamiec wspoldzielona
 void processA() {
-  std::cout << "A: " << getpid()
-            << " USING SCHED: " << sched_getscheduler(0) 
-            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
+  std::cout << "A: " << getpid() << " USING SCHED: " << sched_getscheduler(0)
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0)
+            << std::endl;
 
   sh_m *shmp;
   MessageQueue msgq_frame;
@@ -162,9 +162,9 @@ void processA() {
 }
 
 void processB() {
-  std::cout << "B: " << getpid()
-            << " USING SCHED: " << sched_getscheduler(0) 
-            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
+  std::cout << "B: " << getpid() << " USING SCHED: " << sched_getscheduler(0)
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0)
+            << std::endl;
   sh_m *shmp_f, *shmp_g;
   MessageQueue msgq_frame, msgq_game;
   switch (mode) {
@@ -452,9 +452,9 @@ void processB() {
 }
 
 void processC() {
-  std::cout << "C: " << getpid()
-            << " USING SCHED: " << sched_getscheduler(0) 
-            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
+  std::cout << "C: " << getpid() << " USING SCHED: " << sched_getscheduler(0)
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0)
+            << std::endl;
 
   sh_m *shmp;
   MessageQueue msgq_game;
@@ -536,8 +536,17 @@ void processC() {
 int main(int argc, char *argv[]) {
   // CHANGE PRIORITY
   // nice(delta); <- zwiększanie priorytetu procesu (ujemna delta) wymaga sudo
-  
-  if(argc < 2 && argc > 3) {
+
+  // game state
+  shm_unlink(GAME_STATE);
+  // shared memory
+  shm_unlink(FRAME);
+  shm_unlink(GAME);
+  // message queue
+  mq_unlink(MSGQ_FRAME);
+  mq_unlink(MSGQ_GAME);
+
+  if (argc < 2 && argc > 3) {
     perror("Wrong number of arguments.");
     exit(EXIT_FAILURE);
   }
@@ -545,22 +554,22 @@ int main(int argc, char *argv[]) {
   struct sched_param sp;
   int sched_mode = atoi(argv[1]);
 
-  switch(sched_mode) {
-    // 1. NORMAL SCHEDULING
-    case 0:
+  switch (sched_mode) {
+  // 1. NORMAL SCHEDULING
+  case 0:
     // 1.1: SCHED_OTHER
     sp.sched_priority = 0;
-    ret = sched_setscheduler(0, SCHED_OTHER, &sp );
+    ret = sched_setscheduler(0, SCHED_OTHER, &sp);
     if (ret == -1) {
       perror("sched_setscheduler");
       exit(EXIT_FAILURE);
     }
     break;
 
-    case 1:
+  case 1:
     // 1.2: SCHED_BATCH
     sp.sched_priority = 0;
-    ret = sched_setscheduler(0, SCHED_BATCH, &sp );
+    ret = sched_setscheduler(0, SCHED_BATCH, &sp);
     if (ret == -1) {
       perror("sched_setscheduler");
       exit(EXIT_FAILURE);
@@ -568,38 +577,38 @@ int main(int argc, char *argv[]) {
 
     break;
 
-    case 2:
+  case 2:
     // 1.3: SCHED_IDLE
     sp.sched_priority = 0;
-    ret = sched_setscheduler(0, SCHED_IDLE, &sp );
+    ret = sched_setscheduler(0, SCHED_IDLE, &sp);
     if (ret == -1) {
       perror("sched_setscheduler");
       exit(EXIT_FAILURE);
     }
     break;
 
-    // 2. RT SCHEDULING <- needs sudo
-    case 3:
+  // 2. RT SCHEDULING <- needs sudo
+  case 3:
     // 2.1: SCHED_RR
     sp.sched_priority = 99; // min 1, max 99
-    ret = sched_setscheduler(0, SCHED_RR, &sp );
+    ret = sched_setscheduler(0, SCHED_RR, &sp);
     if (ret == -1) {
       perror("sched_setscheduler");
       exit(EXIT_FAILURE);
     }
     break;
 
-    case 4:
+  case 4:
     // 2.2: SCHED_FIFO
     sp.sched_priority = 99; // min 1, max 99
-    ret = sched_setscheduler(0, SCHED_FIFO, &sp );
+    ret = sched_setscheduler(0, SCHED_FIFO, &sp);
     if (ret == -1) {
       perror("sched_setscheduler");
       exit(EXIT_FAILURE);
     }
     break;
 
-    default:
+  default:
     break;
   }
 
@@ -618,20 +627,11 @@ int main(int argc, char *argv[]) {
     }
   }
   std::cout << "USING MODE: " << ipc_mode << std::endl
-            << "M: " << getpid()
-            << " USING SCHED: " << sched_getscheduler(0) 
-            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
-  
-  std::ofstream output("wyniki/" + ipc_mode + ".txt");
+            << "M: " << getpid() << " USING SCHED: " << sched_getscheduler(0)
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0)
+            << std::endl;
 
-  // shared memory
-  shm_unlink(FRAME);
-  shm_unlink(GAME);
-  // message queue
-  mq_unlink(MSGQ_FRAME);
-  mq_unlink(MSGQ_GAME);
-  // game state
-  shm_unlink(GAME_STATE);
+  std::ofstream output("wyniki/SCHED_" + sched_mode + '_' + ipc_mode + ".txt");
 
   // game state
   gm_st *game_state = createSharedGameState(GAME_STATE);
@@ -675,13 +675,13 @@ int main(int argc, char *argv[]) {
     pipeReceive<int64_t>(pipe_b[0], &buff_b[0], sizeof(int64_t));
     pipeReceive<int64_t>(pipe_b[0], &buff_b[1], sizeof(int64_t));
     pipeReceive<int64_t>(pipe_c[0], &buff_c, sizeof(int64_t));
-    output << (buff_b[0] - buff_a) / 1000 << ";" << (buff_c - buff_b[1]) / 1000
-           << ";" << (buff_b[1] - buff_b[0]) / 1000 << ";"
-           << (buff_c - buff_a) / 1000 << ";" << (buff_c - prev_frame) / 1000
+    output << (buff_b[0] - buff_a) / 1000 << ';' << (buff_c - buff_b[1]) / 1000
+           << ';' << (buff_b[1] - buff_b[0]) / 1000 << ';'
+           << (buff_c - buff_a) / 1000 << ';' << (buff_c - prev_frame) / 1000
            << '\n';
     prev_frame = buff_c;
   }
-  output.flush();
+  // output.flush();
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
