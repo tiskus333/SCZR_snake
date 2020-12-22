@@ -10,6 +10,10 @@
 #include <opencv2/videoio.hpp>
 #include <string.h>
 
+#include <sched.h>
+#include <sys/time.h>
+#include <sys/resource.h>
+
 bool is_paused = false;
 bool repeat_game = false;
 bool configure_options = false;
@@ -75,7 +79,9 @@ void initProcess(void (*fun)()) {
 
 // odczyt kamery: klatka -> pamiec wspoldzielona
 void processA() {
-  std::cout << "A: " << getpid() << std::endl;
+  std::cout << "A: " << getpid()
+            << " USING SCHED: " << sched_getscheduler(0) 
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
 
   sh_m *shmp;
   MessageQueue msgq_frame;
@@ -156,7 +162,9 @@ void processA() {
 }
 
 void processB() {
-  std::cout << "B: " << getpid() << std::endl;
+  std::cout << "B: " << getpid()
+            << " USING SCHED: " << sched_getscheduler(0) 
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
   sh_m *shmp_f, *shmp_g;
   MessageQueue msgq_frame, msgq_game;
   switch (mode) {
@@ -444,7 +452,9 @@ void processB() {
 }
 
 void processC() {
-  std::cout << "C: " << getpid() << std::endl;
+  std::cout << "C: " << getpid()
+            << " USING SCHED: " << sched_getscheduler(0) 
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
 
   sh_m *shmp;
   MessageQueue msgq_game;
@@ -524,12 +534,80 @@ void processC() {
 }
 
 int main(int argc, char *argv[]) {
-  std::cout << "M: " << getpid() << std::endl;
+  // CHANGE PRIORITY
+  // nice(delta); <- zwiększanie priorytetu procesu (ujemna delta) wymaga sudo
+  
+  if(argc < 2 && argc > 3) {
+    perror("Wrong number of arguments.");
+    exit(EXIT_FAILURE);
+  }
+  int ret;
+  struct sched_param sp;
+  int sched_mode = atoi(argv[1]);
+
+  switch(sched_mode) {
+    // 1. NORMAL SCHEDULING
+    case 0:
+    // 1.1: SCHED_OTHER
+    sp.sched_priority = 0;
+    ret = sched_setscheduler(0, SCHED_OTHER, &sp );
+    if (ret == -1) {
+      perror("sched_setscheduler");
+      exit(EXIT_FAILURE);
+    }
+    break;
+
+    case 1:
+    // 1.2: SCHED_BATCH
+    sp.sched_priority = 0;
+    ret = sched_setscheduler(0, SCHED_BATCH, &sp );
+    if (ret == -1) {
+      perror("sched_setscheduler");
+      exit(EXIT_FAILURE);
+    }
+
+    break;
+
+    case 2:
+    // 1.3: SCHED_IDLE
+    sp.sched_priority = 0;
+    ret = sched_setscheduler(0, SCHED_IDLE, &sp );
+    if (ret == -1) {
+      perror("sched_setscheduler");
+      exit(EXIT_FAILURE);
+    }
+    break;
+
+    // 2. RT SCHEDULING <- needs sudo
+    case 3:
+    // 2.1: SCHED_RR
+    sp.sched_priority = 99; // min 1, max 99
+    ret = sched_setscheduler(0, SCHED_RR, &sp );
+    if (ret == -1) {
+      perror("sched_setscheduler");
+      exit(EXIT_FAILURE);
+    }
+    break;
+
+    case 4:
+    // 2.2: SCHED_FIFO
+    sp.sched_priority = 99; // min 1, max 99
+    ret = sched_setscheduler(0, SCHED_FIFO, &sp );
+    if (ret == -1) {
+      perror("sched_setscheduler");
+      exit(EXIT_FAILURE);
+    }
+    break;
+
+    default:
+    break;
+  }
+
   // unlink from shared memory object if still exists
   mode = MEMORY_MODES::SHARED_MEMORY;
   std::string ipc_mode = "SHARED_MEMORY";
-  if (argc == 2) {
-    const std::string val = argv[1];
+  if (argc == 3) {
+    const std::string val = argv[2];
     if (val == "pipes") {
       mode = MEMORY_MODES::PIPE;
       ipc_mode = "PIPES";
@@ -540,7 +618,10 @@ int main(int argc, char *argv[]) {
     }
   }
   std::cout << "USING MODE: " << ipc_mode << std::endl
-            << "M: " << getpid() << std::endl;
+            << "M: " << getpid()
+            << " USING SCHED: " << sched_getscheduler(0) 
+            << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0) << std::endl;
+  
   std::ofstream output("wyniki/" + ipc_mode + ".txt");
 
   // shared memory
@@ -600,6 +681,7 @@ int main(int argc, char *argv[]) {
            << '\n';
     prev_frame = buff_c;
   }
+  output.flush();
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
