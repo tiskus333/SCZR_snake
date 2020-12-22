@@ -631,7 +631,8 @@ int main(int argc, char *argv[]) {
             << ", PROCESS PRIORITY: " << getpriority(PRIO_PROCESS, 0)
             << std::endl;
 
-  std::ofstream output("wyniki/SCHED_" + sched_mode + '_' + ipc_mode + ".txt");
+  std::ofstream output("wyniki/SCHED_" + std::to_string(sched_mode) + '_' +
+                       ipc_mode + ".txt");
 
   // game state
   gm_st *game_state = createSharedGameState(GAME_STATE);
