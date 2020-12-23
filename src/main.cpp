@@ -59,10 +59,8 @@ const char *MSGQ_FRAME = "/msgq_frame";
 const char *MSGQ_GAME = "/msgq_game";
 
 // timestamps
-const char *TIMER_A = "/timer_a",
-           *TIMER_B_IN = "/timer_b_in",
-           *TIMER_B_OUT = "/timer_b_out",
-           *TIMER_C = "/timer_c";
+const char *TIMER_A = "/timer_a", *TIMER_B_IN = "/timer_b_in",
+           *TIMER_B_OUT = "/timer_b_out", *TIMER_C = "/timer_c";
 
 // game state
 const char *GAME_STATE = "/game_state";
@@ -100,7 +98,7 @@ void processA() {
 
   // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
-  
+
   // timestamps
   time_buffer *timer_a = openSharedTimerBuffer(TIMER_A);
   int64_t *buffer = new int64_t[BUFFER_SIZE]{0};
@@ -119,7 +117,7 @@ void processA() {
 
     // timestamps
     buffer[size] = getTimestamp();
-    if( ++size == BUFFER_SIZE ) {
+    if (++size == BUFFER_SIZE) {
       timer_a->writeBuffer(buffer, size);
       size = 0;
     }
@@ -139,7 +137,7 @@ void processA() {
       break;
     }
   }
-  if(size != 0)
+  if (size != 0)
     timer_a->writeBuffer(buffer, size);
 
   switch (mode) {
@@ -224,11 +222,10 @@ void processB() {
 
       // timestamps
       buffer_in[size_in] = getTimestamp();
-      if( ++size_in == BUFFER_SIZE ) {
+      if (++size_in == BUFFER_SIZE) {
         timer_b_in->writeBuffer(buffer_in, size_in);
         size_in = 0;
       }
-      
 
       cv::flip(frame, frame, 1);
       cv::putText(frame, "Press SPACE to begin",
@@ -237,7 +234,7 @@ void processB() {
 
       // timestamps
       buffer_out[size_out] = getTimestamp();
-      if( ++size_out == BUFFER_SIZE ) {
+      if (++size_out == BUFFER_SIZE) {
         timer_b_out->writeBuffer(buffer_out, size_out);
         size_out = 0;
       }
@@ -281,7 +278,7 @@ void processB() {
 
       // timestamps
       buffer_in[size_in] = getTimestamp();
-      if( ++size_in == BUFFER_SIZE ) {
+      if (++size_in == BUFFER_SIZE) {
         timer_b_in->writeBuffer(buffer_in, size_in);
         size_in = 0;
       }
@@ -352,7 +349,7 @@ void processB() {
       }
       // timestamps
       buffer_out[size_out] = getTimestamp();
-      if( ++size_out == BUFFER_SIZE ) {
+      if (++size_out == BUFFER_SIZE) {
         timer_b_out->writeBuffer(buffer_out, size_out);
         size_out = 0;
       }
@@ -401,7 +398,7 @@ void processB() {
 
       // timestamps
       buffer_in[size_in] = getTimestamp();
-      if( ++size_in == BUFFER_SIZE ) {
+      if (++size_in == BUFFER_SIZE) {
         timer_b_in->writeBuffer(buffer_in, size_in);
         size_in = 0;
       }
@@ -416,7 +413,7 @@ void processB() {
 
       // timestamps
       buffer_out[size_out] = getTimestamp();
-      if( ++size_out == BUFFER_SIZE ) {
+      if (++size_out == BUFFER_SIZE) {
         timer_b_out->writeBuffer(buffer_out, size_out);
         size_out = 0;
       }
@@ -449,9 +446,9 @@ void processB() {
 
   } while (repeat_game);
 
-  if(size_in != 0)
+  if (size_in != 0)
     timer_b_in->writeBuffer(buffer_in, size_in);
-  if(size_out != 0)
+  if (size_out != 0)
     timer_b_out->writeBuffer(buffer_out, size_out);
 
   switch (mode) {
@@ -529,7 +526,7 @@ void processC() {
 
     // timestamps
     buffer[size] = getTimestamp();
-    if( ++size == BUFFER_SIZE ) {
+    if (++size == BUFFER_SIZE) {
       timer_c->writeBuffer(buffer, size);
       size = 0;
     }
@@ -541,7 +538,7 @@ void processC() {
     game_state->writeKey(key_pressed);
   }
 
-  if(size != 0)
+  if (size != 0)
     timer_c->writeBuffer(buffer, size);
 
   switch (mode) {
@@ -585,10 +582,10 @@ int main(int argc, char *argv[]) {
   std::cout << "USING MODE: " << ipc_mode << std::endl
             << "M: " << getpid() << std::endl;
 
-  std::ofstream output_a("wyniki/" + ipc_mode + "_A.txt");
-  std::ofstream output_b_in("wyniki/" + ipc_mode + "_B_IN.txt");
-  std::ofstream output_b_out("wyniki/" + ipc_mode + "_B_OUT.txt");
-  std::ofstream output_c("wyniki/" + ipc_mode + "_C.txt");
+  std::ofstream output_a("wyniki2/" + ipc_mode + "_A.txt");
+  std::ofstream output_b_in("wyniki2/" + ipc_mode + "_B_IN.txt");
+  std::ofstream output_b_out("wyniki2/" + ipc_mode + "_B_OUT.txt");
+  std::ofstream output_c("wyniki2/" + ipc_mode + "_C.txt");
 
   // shared memory
   shm_unlink(FRAME);
@@ -636,69 +633,67 @@ int main(int argc, char *argv[]) {
   initProcess(processB);
   initProcess(processC);
 
-  int64_t *buff_a = new int64_t[BUFFER_SIZE], 
-          buff_b_in[BUFFER_SIZE],
-          buff_b_out[BUFFER_SIZE],
-          buff_c[BUFFER_SIZE];
+  int64_t *buff_a = new int64_t[BUFFER_SIZE], buff_b_in[BUFFER_SIZE],
+          buff_b_out[BUFFER_SIZE], buff_c[BUFFER_SIZE];
 
   while (game_state->readKey() != 27) {
-    if(timer_a->tryReadBuffer(buff_a)) {
-      std::cout << " A" << std::endl;
-      for(size_t i = 0; i < timer_a->size_; ++i ) {
-        output_a << buff_a[i] << "\n";
+    if (timer_a->tryReadBuffer(buff_a)) {
+      // std::cout << " A" << std::endl;
+      for (size_t i = 0; i < timer_a->size_; ++i) {
+        output_a << buff_a[i] << '\n';
       }
       timer_a->size_ = 0;
     }
-    if(timer_b_in->tryReadBuffer(buff_b_in)) {
-      std::cout << " B IN" << std::endl;
-      for(size_t i = 0; i < timer_b_in->size_; ++i ) {
-        output_b_in << buff_b_in[i] << "\n";
+    if (timer_b_in->tryReadBuffer(buff_b_in)) {
+      // std::cout << " B IN" << std::endl;
+      for (size_t i = 0; i < timer_b_in->size_; ++i) {
+        output_b_in << buff_b_in[i] << '\n';
       }
       timer_b_in->size_ = 0;
     }
-    if(timer_b_out->tryReadBuffer(buff_b_out)) {
-      std::cout << " B OUT" << std::endl;
-      for(size_t i = 0; i < timer_b_out->size_; ++i ) {
-        output_b_out << buff_b_out[i] << "\n";
+    if (timer_b_out->tryReadBuffer(buff_b_out)) {
+      // std::cout << " B OUT" << std::endl;
+      for (size_t i = 0; i < timer_b_out->size_; ++i) {
+        output_b_out << buff_b_out[i] << '\n';
       }
       timer_b_out->size_ = 0;
     }
-    if(timer_c->tryReadBuffer(buff_c)) {
-      std::cout << " C" << std::endl;
-      for(size_t i = 0; i < timer_c->size_; ++i ) {
-        output_c << buff_c[i] << "\n";
+    if (timer_c->tryReadBuffer(buff_c)) {
+      // std::cout << " C" << std::endl;
+      for (size_t i = 0; i < timer_c->size_; ++i) {
+        output_c << buff_c[i] << '\n';
       }
       timer_c->size_ = 0;
     }
   }
 
   sleep(3);
-  
-  if(timer_a->tryReadBuffer(buff_a)) {
-    std::cout << " A reszta" << std::endl;
-    for(size_t i = 0; i < timer_a->size_; ++i ) {
-      output_a << buff_a[i] << "\n";
+
+  if (timer_a->tryReadBuffer(buff_a)) {
+    // std::cout << " A reszta" << std::endl;
+    for (size_t i = 0; i < timer_a->size_; ++i) {
+      output_a << buff_a[i] << '\n';
     }
     timer_a->size_ = 0;
   }
-  if(timer_b_in->tryReadBuffer(buff_b_in)) {
-    std::cout << " B IN reszta" << std::endl;
-    for(size_t i = 0; i < timer_b_in->size_; ++i ) {
-      output_b_in << buff_b_in[i] << "\n";
+  if (timer_b_in->tryReadBuffer(buff_b_in)) {
+    // std::cout << " B IN reszta" << std::endl;
+    for (size_t i = 0; i < timer_b_in->size_; ++i) {
+      output_b_in << buff_b_in[i] << '\n';
     }
     timer_b_in->size_ = 0;
   }
-  if(timer_b_out->tryReadBuffer(buff_b_out)) {
-    std::cout << " B OUT reszta" << std::endl;
-    for(size_t i = 0; i < timer_b_out->size_; ++i ) {
-      output_b_out << buff_b_out[i] << "\n";
+  if (timer_b_out->tryReadBuffer(buff_b_out)) {
+    // std::cout << " B OUT reszta" << std::endl;
+    for (size_t i = 0; i < timer_b_out->size_; ++i) {
+      output_b_out << buff_b_out[i] << '\n';
     }
     timer_b_out->size_ = 0;
   }
-  if(timer_c->tryReadBuffer(buff_c)) {
-    std::cout << " C reszta" << std::endl;
-    for(size_t i = 0; i < timer_c->size_; ++i ) {
-      output_c << buff_c[i] << "\n";
+  if (timer_c->tryReadBuffer(buff_c)) {
+    // std::cout << " C reszta" << std::endl;
+    for (size_t i = 0; i < timer_c->size_; ++i) {
+      output_c << buff_c[i] << '\n';
     }
     timer_c->size_ = 0;
   }

@@ -1,11 +1,11 @@
 #ifndef MESSAGEQUEUE_H
 #define MESSAGEQUEUE_H
 
-#include <unistd.h>
 #include <sys/types.h>
+#include <unistd.h>
 
-#include <mqueue.h>
 #include <fcntl.h>
+#include <mqueue.h>
 #include <sys/stat.h>
 
 #include <stdio.h>
@@ -20,10 +20,10 @@ class MessageQueue {
 
   // constants
   const long PAYLOAD_SIZE = 4096;
-  const long MSGQ_MAX_MSG = 1;       // maximum 10
+  const long MSGQ_MAX_MSG = 10; // maximum 10
   time_t TIMEOUT = 10;
 
-  public:
+public:
   MessageQueue();
   void create(const char *msgq_file_name);
   void open(const char *msgq_file_name, const int flag);

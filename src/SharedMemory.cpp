@@ -71,7 +71,7 @@ gm_st *createSharedGameState(const char *path_name) {
 
   // map frame buffer onto shared memory
   gm_st *shmp = (gm_st *)mmap(NULL, sizeof(*shmp), PROT_READ | PROT_WRITE,
-                            MAP_SHARED, fd, 0);
+                              MAP_SHARED, fd, 0);
   if (shmp == MAP_FAILED) {
     perror("main: Cannot map memory.");
     exit(EXIT_FAILURE);
@@ -112,7 +112,7 @@ gm_st *openSharedGameState(const char *path_name) {
   }
 
   gm_st *shmp = (gm_st *)mmap(NULL, sizeof(*shmp), PROT_READ | PROT_WRITE,
-                            MAP_SHARED, fd, 0);
+                              MAP_SHARED, fd, 0);
   if (shmp == MAP_FAILED) {
     perror("Cannot map memory.");
     exit(EXIT_FAILURE);
@@ -121,7 +121,7 @@ gm_st *openSharedGameState(const char *path_name) {
 }
 
 void SharedFrame::sendToSharedMemory(const unsigned char *p_data,
-                                      const size_t data_size) {
+                                     const size_t data_size) {
   // close write semaphore
   if (sem_wait(&sem_write)) {
     perror("A: sem_wait error.");
@@ -136,7 +136,7 @@ void SharedFrame::sendToSharedMemory(const unsigned char *p_data,
 }
 
 void SharedFrame::receiveFromSharedMemory(unsigned char *p_write_to,
-                                           const size_t data_size) {
+                                          const size_t data_size) {
   // close read semaphore
   if (sem_wait(&sem_read)) {
     perror("A: sem_wait error.");
@@ -170,17 +170,17 @@ char SharedGameState::readKey() {
     exit(EXIT_FAILURE);
   }
   ++read_count;
-  if(read_count == 1) {
+  if (read_count == 1) {
     if (sem_wait(&resource)) {
       perror("sem_wait");
       exit(EXIT_FAILURE);
     }
   }
-  if(sem_post(&sem_read)) {
+  if (sem_post(&sem_read)) {
     perror("sem_post");
     exit(EXIT_FAILURE);
   }
-  if(sem_post(&try_read)) {
+  if (sem_post(&try_read)) {
     perror("sem_post");
     exit(EXIT_FAILURE);
   }
@@ -192,13 +192,13 @@ char SharedGameState::readKey() {
     exit(EXIT_FAILURE);
   }
   --read_count;
-  if(read_count == 0) {
-    if(sem_post(&resource)) {
+  if (read_count == 0) {
+    if (sem_post(&resource)) {
       perror("sem_post");
       exit(EXIT_FAILURE);
     }
   }
-  if(sem_post(&sem_read)) {
+  if (sem_post(&sem_read)) {
     perror("sem_post");
     exit(EXIT_FAILURE);
   }
@@ -211,7 +211,7 @@ void SharedGameState::writeKey(const char &key) {
     exit(EXIT_FAILURE);
   }
   ++write_count;
-  if(write_count == 1) {
+  if (write_count == 1) {
     if (sem_wait(&try_read)) {
       perror("sem_wait");
       exit(EXIT_FAILURE);
@@ -228,7 +228,7 @@ void SharedGameState::writeKey(const char &key) {
 
   memcpy(&this->key_pressed, &key, sizeof(char));
 
-  if(sem_post(&resource)) {
+  if (sem_post(&resource)) {
     perror("sem_post");
     exit(EXIT_FAILURE);
   }
@@ -237,7 +237,7 @@ void SharedGameState::writeKey(const char &key) {
     exit(EXIT_FAILURE);
   }
   --write_count;
-  if(write_count == 0) {
+  if (write_count == 0) {
     if (sem_post(&try_read)) {
       perror("sem_post");
       exit(EXIT_FAILURE);
@@ -264,8 +264,8 @@ time_buffer *createSharedTimerBuffer(const char *path_name) {
   }
 
   // map frame buffer onto shared memory
-  time_buffer *shmp = (time_buffer *)mmap(NULL, sizeof(*shmp), PROT_READ | PROT_WRITE,
-                            MAP_SHARED, fd, 0);
+  time_buffer *shmp = (time_buffer *)mmap(
+      NULL, sizeof(*shmp), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (shmp == MAP_FAILED) {
     perror("main: Cannot map memory.");
     exit(EXIT_FAILURE);
@@ -291,8 +291,8 @@ time_buffer *openSharedTimerBuffer(const char *path_name) {
     perror("Cannot open shared memory.");
     exit(EXIT_FAILURE);
   }
-  time_buffer *shmp = (time_buffer *)mmap(NULL, sizeof(*shmp), PROT_READ | PROT_WRITE,
-                                          MAP_SHARED, fd, 0);
+  time_buffer *shmp = (time_buffer *)mmap(
+      NULL, sizeof(*shmp), PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
   if (shmp == MAP_FAILED) {
     perror("Cannot map memory.");
     exit(EXIT_FAILURE);
@@ -306,7 +306,8 @@ void time_buffer::writeBuffer(const int64_t *buffer, size_t buffer_size) {
     perror("sem_wait");
     exit(EXIT_FAILURE);
   }
-  memcpy(&this->buffer_, buffer, std::min(buffer_size, BUFFER_SIZE) * sizeof(int64_t));
+  memcpy(&this->buffer_, buffer,
+         std::min(buffer_size, BUFFER_SIZE) * sizeof(int64_t));
   memcpy(&this->size_, &buffer_size, sizeof(buffer_size));
   // open read semaphore
   if (sem_post(&sem_read)) {
@@ -319,13 +320,14 @@ bool time_buffer::tryReadBuffer(int64_t *buffer) {
   // close read semaphore
   if (sem_trywait(&sem_read))
     return false;
-  memcpy(buffer, &this->buffer_, std::min(size_, BUFFER_SIZE) * sizeof(int64_t));
+  memcpy(buffer, &this->buffer_,
+         std::min(size_, BUFFER_SIZE) * sizeof(int64_t));
   // open write semaphore
   if (sem_post(&sem_write)) {
     perror("sem_post ");
     exit(EXIT_FAILURE);
   }
-  std::cout << "UDA ŁOSIE";
+  // std::cout << "UDA ŁOSIE";
   return true;
 }
 
@@ -335,11 +337,12 @@ void time_buffer::readBuffer(int64_t *buffer) {
     perror("sem_wait ");
     exit(EXIT_FAILURE);
   }
-  memcpy(buffer, &this->buffer_, std::min(size_, BUFFER_SIZE) * sizeof(int64_t));
+  memcpy(buffer, &this->buffer_,
+         std::min(size_, BUFFER_SIZE) * sizeof(int64_t));
   // open write semaphore
   if (sem_post(&sem_write)) {
     perror("sem_post ");
     exit(EXIT_FAILURE);
   }
-  std::cout << "reszta";
+  // std::cout << "reszta";
 }
