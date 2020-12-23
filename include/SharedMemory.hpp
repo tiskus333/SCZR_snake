@@ -50,4 +50,21 @@ typedef struct SharedGameState {
 gm_st *createSharedGameState(const char *path_name);
 gm_st *openSharedGameState(const char *path_name);
 
+// // //
+const size_t BUFFER_SIZE = 50;
+
+typedef struct SharedTimerBuffer {
+  sem_t sem_read;
+  sem_t sem_write;
+  size_t size_;
+  int64_t buffer_[BUFFER_SIZE];
+
+  void readBuffer(int64_t *buffer);
+  bool tryReadBuffer(int64_t *buffer);
+  void writeBuffer(const int64_t *buffer, size_t buffer_size);
+} time_buffer;
+
+time_buffer *createSharedTimerBuffer(const char *path_name);
+time_buffer *openSharedTimerBuffer(const char *path_name);
+
 #endif

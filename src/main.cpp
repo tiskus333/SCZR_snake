@@ -59,7 +59,11 @@ const char *MSGQ_FRAME = "/msgq_frame";
 const char *MSGQ_GAME = "/msgq_game";
 
 // timestamps
-int pipe_a[2], pipe_b[2], pipe_c[2];
+const char *TIMER_A = "/timer_a",
+           *TIMER_B_IN = "/timer_b_in",
+           *TIMER_B_OUT = "/timer_b_out",
+           *TIMER_C = "/timer_c";
+
 // game state
 const char *GAME_STATE = "/game_state";
 
@@ -96,9 +100,11 @@ void processA() {
 
   // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
+  
   // timestamps
-  close(pipe_a[0]);
-  int64_t timestamp;
+  time_buffer *timer_a = openSharedTimerBuffer(TIMER_A);
+  int64_t *buffer = new int64_t[BUFFER_SIZE];
+  int size = 0;
 
   cv::Mat frame;
   cv::VideoCapture camera(0);
@@ -112,8 +118,11 @@ void processA() {
     camera >> frame;
 
     // timestamps
-    timestamp = getTimestamp();
-    pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
+    buffer[size] = getTimestamp();
+    if( ++size == BUFFER_SIZE ) {
+      timer_a->writeBuffer(buffer, size);
+      size = 0;
+    }
 
     // SWITCH
     switch (mode) {
@@ -130,8 +139,8 @@ void processA() {
       break;
     }
   }
-
-  pipeSend<int64_t>(pipe_a[1], &timestamp, sizeof(timestamp));
+  if(size != 0)
+    timer_a->writeBuffer(buffer, size);
 
   switch (mode) {
   case MEMORY_MODES::SHARED_MEMORY:
@@ -148,7 +157,7 @@ void processA() {
   }
 
   // timestamps
-  close(pipe_a[1]);
+  shm_unlink(TIMER_A);
   // game state
   shm_unlink(GAME_STATE);
 
@@ -177,8 +186,11 @@ void processB() {
   }
 
   // timestamps
-  close(pipe_b[0]);
-  int64_t timestamp;
+  time_buffer *timer_b_in = openSharedTimerBuffer(TIMER_B_IN),
+              *timer_b_out = openSharedTimerBuffer(TIMER_B_OUT);
+  int64_t buffer_in[BUFFER_SIZE], buffer_out[BUFFER_SIZE];
+  int size_in = 0, size_out = 0;
+
   // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
 
@@ -211,8 +223,12 @@ void processB() {
       }
 
       // timestamps
-      timestamp = getTimestamp();
-      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+      buffer_in[size_in] = getTimestamp();
+      if( ++size_in == BUFFER_SIZE ) {
+        timer_b_in->writeBuffer(buffer_in, size_in);
+        size_in = 0;
+      }
+      
 
       cv::flip(frame, frame, 1);
       cv::putText(frame, "Press SPACE to begin",
@@ -220,8 +236,11 @@ void processB() {
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
 
       // timestamps
-      timestamp = getTimestamp();
-      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+      buffer_out[size_out] = getTimestamp();
+      if( ++size_out == BUFFER_SIZE ) {
+        timer_b_out->writeBuffer(buffer_out, size_out);
+        size_out = 0;
+      }
 
       // SWITCH
       switch (mode) {
@@ -261,8 +280,11 @@ void processB() {
       }
 
       // timestamps
-      timestamp = getTimestamp();
-      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+      buffer_in[size_in] = getTimestamp();
+      if( ++size_in == BUFFER_SIZE ) {
+        timer_b_in->writeBuffer(buffer_in, size_in);
+        size_in = 0;
+      }
 
       cv::flip(frame, frame, 1);
       frame.copyTo(game_frame);
@@ -329,8 +351,11 @@ void processB() {
         }
       }
       // timestamps
-      timestamp = getTimestamp();
-      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+      buffer_out[size_out] = getTimestamp();
+      if( ++size_out == BUFFER_SIZE ) {
+        timer_b_out->writeBuffer(buffer_out, size_out);
+        size_out = 0;
+      }
 
       // SWITCH
       switch (mode) {
@@ -375,8 +400,11 @@ void processB() {
       }
 
       // timestamps
-      timestamp = getTimestamp();
-      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+      buffer_in[size_in] = getTimestamp();
+      if( ++size_in == BUFFER_SIZE ) {
+        timer_b_in->writeBuffer(buffer_in, size_in);
+        size_in = 0;
+      }
 
       cv::flip(frame, frame, 1);
       cv::putText(frame, "GAME OVER!",
@@ -387,8 +415,11 @@ void processB() {
                   cv::HersheyFonts::FONT_HERSHEY_DUPLEX, 1, {0, 0, 255}, 2);
 
       // timestamps
-      timestamp = getTimestamp();
-      pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+      buffer_out[size_out] = getTimestamp();
+      if( ++size_out == BUFFER_SIZE ) {
+        timer_b_out->writeBuffer(buffer_out, size_out);
+        size_out = 0;
+      }
 
       // SWITCH
       switch (mode) {
@@ -418,7 +449,10 @@ void processB() {
 
   } while (repeat_game);
 
-  pipeSend<int64_t>(pipe_b[1], &timestamp, sizeof(timestamp));
+  if(size_in != 0)
+    timer_b_in->writeBuffer(buffer_in, size_in);
+  if(size_out != 0)
+    timer_b_out->writeBuffer(buffer_out, size_out);
 
   switch (mode) {
   case MEMORY_MODES::SHARED_MEMORY:
@@ -438,7 +472,8 @@ void processB() {
   }
 
   // timestamps
-  close(pipe_b[1]);
+  shm_unlink(TIMER_B_IN);
+  shm_unlink(TIMER_B_OUT);
   // game state
   shm_unlink(GAME_STATE);
 }
@@ -464,8 +499,10 @@ void processC() {
   }
 
   // timestamps
-  close(pipe_c[0]);
-  int64_t timestamp;
+  time_buffer *timer_c = openSharedTimerBuffer(TIMER_C);
+  int64_t buffer[BUFFER_SIZE];
+  int size = 0;
+
   // game state
   gm_st *game_state = openSharedGameState(GAME_STATE);
 
@@ -491,8 +528,11 @@ void processC() {
     }
 
     // timestamps
-    timestamp = getTimestamp();
-    pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
+    buffer[size] = getTimestamp();
+    if( ++size == BUFFER_SIZE ) {
+      timer_c->writeBuffer(buffer, size);
+      size = 0;
+    }
 
     cv::imshow(window_game_name, frame);
     key_pressed = cv::waitKey(1);
@@ -501,7 +541,8 @@ void processC() {
     game_state->writeKey(key_pressed);
   }
 
-  pipeSend<int64_t>(pipe_c[1], &timestamp, sizeof(timestamp));
+  if(size != 0)
+    timer_c->writeBuffer(buffer, size);
 
   switch (mode) {
   case MEMORY_MODES::SHARED_MEMORY:
@@ -518,10 +559,12 @@ void processC() {
   }
 
   // timestamps
-  close(pipe_c[1]);
+  shm_unlink(TIMER_C);
   // game state
   shm_unlink(GAME_STATE);
 }
+
+// // //
 
 int main(int argc, char *argv[]) {
   std::cout << "M: " << getpid() << std::endl;
@@ -541,7 +584,11 @@ int main(int argc, char *argv[]) {
   }
   std::cout << "USING MODE: " << ipc_mode << std::endl
             << "M: " << getpid() << std::endl;
-  std::ofstream output("wyniki/" + ipc_mode + ".txt");
+
+  std::ofstream output_a("wyniki/" + ipc_mode + "_A.txt");
+  std::ofstream output_b_in("wyniki/" + ipc_mode + "_B_IN.txt");
+  std::ofstream output_b_out("wyniki/" + ipc_mode + "_B_OUT.txt");
+  std::ofstream output_c("wyniki/" + ipc_mode + "_C.txt");
 
   // shared memory
   shm_unlink(FRAME);
@@ -551,9 +598,20 @@ int main(int argc, char *argv[]) {
   mq_unlink(MSGQ_GAME);
   // game state
   shm_unlink(GAME_STATE);
+  // time buffers
+  shm_unlink(TIMER_A);
+  shm_unlink(TIMER_B_IN);
+  shm_unlink(TIMER_B_OUT);
+  shm_unlink(TIMER_C);
 
   // game state
   gm_st *game_state = createSharedGameState(GAME_STATE);
+
+  // time buffers
+  time_buffer *timer_a = createSharedTimerBuffer(TIMER_A);
+  time_buffer *timer_b_in = createSharedTimerBuffer(TIMER_B_IN);
+  time_buffer *timer_b_out = createSharedTimerBuffer(TIMER_B_OUT);
+  time_buffer *timer_c = createSharedTimerBuffer(TIMER_C);
 
   MessageQueue frame, game;
 
@@ -573,33 +631,82 @@ int main(int argc, char *argv[]) {
   default:
     break;
   }
-  // pipe
-  createPipe(pipe_a);
-  createPipe(pipe_b);
-  createPipe(pipe_c);
 
   initProcess(processA);
   initProcess(processB);
   initProcess(processC);
 
-  // timestamps
-  close(pipe_a[1]);
-  close(pipe_b[1]);
-  close(pipe_c[1]);
-  int64_t buff_a, buff_b[2], buff_c, prev_frame;
+  int64_t *buff_a = new int64_t[BUFFER_SIZE], 
+          buff_b_in[BUFFER_SIZE],
+          buff_b_out[BUFFER_SIZE],
+          buff_c[BUFFER_SIZE];
 
-  prev_frame = getTimestamp();
   while (game_state->readKey() != 27) {
-    pipeReceive<int64_t>(pipe_a[0], &buff_a, sizeof(int64_t));
-    pipeReceive<int64_t>(pipe_b[0], &buff_b[0], sizeof(int64_t));
-    pipeReceive<int64_t>(pipe_b[0], &buff_b[1], sizeof(int64_t));
-    pipeReceive<int64_t>(pipe_c[0], &buff_c, sizeof(int64_t));
-    output << (buff_b[0] - buff_a) / 1000 << ';' << (buff_c - buff_b[1]) / 1000
-           << ';' << (buff_b[1] - buff_b[0]) / 1000 << ';'
-           << (buff_c - buff_a) / 1000 << ';' << (buff_c - prev_frame) / 1000
-           << '\n';
-    prev_frame = buff_c;
+    if(timer_a->tryReadBuffer(buff_a)) {
+      std::cout << " A" << std::endl;
+      for(size_t i = 0; i < timer_a->size_; ++i ) {
+        output_a << buff_a[i] << "\n";
+      }
+      timer_a->size_ = 0;
+    }
+    if(timer_b_in->tryReadBuffer(buff_b_in)) {
+      std::cout << " B IN" << std::endl;
+      for(size_t i = 0; i < timer_b_in->size_; ++i ) {
+        output_b_in << buff_b_in[i] << "\n";
+      }
+      timer_b_in->size_ = 0;
+    }
+    if(timer_b_out->tryReadBuffer(buff_b_out)) {
+      std::cout << " B OUT" << std::endl;
+      for(size_t i = 0; i < timer_b_out->size_; ++i ) {
+        output_b_out << buff_b_out[i] << "\n";
+      }
+      timer_b_out->size_ = 0;
+    }
+    if(timer_c->tryReadBuffer(buff_c)) {
+      std::cout << " C" << std::endl;
+      for(size_t i = 0; i < timer_c->size_; ++i ) {
+        output_c << buff_c[i] << "\n";
+      }
+      timer_c->size_ = 0;
+    }
   }
+
+  sleep(3);
+  
+  if(timer_a->tryReadBuffer(buff_a)) {
+    std::cout << " A reszta" << std::endl;
+    for(size_t i = 0; i < timer_a->size_; ++i ) {
+      output_a << buff_a[i] << "\n";
+    }
+    timer_a->size_ = 0;
+  }
+  if(timer_b_in->tryReadBuffer(buff_b_in)) {
+    std::cout << " B IN reszta" << std::endl;
+    for(size_t i = 0; i < timer_b_in->size_; ++i ) {
+      output_b_in << buff_b_in[i] << "\n";
+    }
+    timer_b_in->size_ = 0;
+  }
+  if(timer_b_out->tryReadBuffer(buff_b_out)) {
+    std::cout << " B OUT reszta" << std::endl;
+    for(size_t i = 0; i < timer_b_out->size_; ++i ) {
+      output_b_out << buff_b_out[i] << "\n";
+    }
+    timer_b_out->size_ = 0;
+  }
+  if(timer_c->tryReadBuffer(buff_c)) {
+    std::cout << " C reszta" << std::endl;
+    for(size_t i = 0; i < timer_c->size_; ++i ) {
+      output_c << buff_c[i] << "\n";
+    }
+    timer_c->size_ = 0;
+  }
+  output_a.close();
+  output_b_in.close();
+  output_b_out.close();
+  output_c.close();
+
   // shared memory
   shm_unlink(FRAME);
   shm_unlink(GAME);
@@ -607,10 +714,12 @@ int main(int argc, char *argv[]) {
   mq_unlink(MSGQ_FRAME);
   mq_unlink(MSGQ_GAME);
 
-  // timestamps
-  close(pipe_a[0]);
-  close(pipe_b[0]);
-  close(pipe_c[0]);
+  // time buffers
+  shm_unlink(TIMER_A);
+  shm_unlink(TIMER_B_IN);
+  shm_unlink(TIMER_B_OUT);
+  shm_unlink(TIMER_C);
+
   // game state
   shm_unlink(GAME_STATE);
   exit(EXIT_SUCCESS);
