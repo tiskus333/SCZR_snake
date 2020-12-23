@@ -306,7 +306,7 @@ void time_buffer::writeBuffer(const int64_t *buffer, size_t buffer_size) {
     perror("sem_wait");
     exit(EXIT_FAILURE);
   }
-  memcpy(&this->buffer_, buffer, std::min(buffer_size, BUFFER_SIZE));
+  memcpy(&this->buffer_, buffer, std::min(buffer_size, BUFFER_SIZE) * sizeof(int64_t));
   memcpy(&this->size_, &buffer_size, sizeof(buffer_size));
   // open read semaphore
   if (sem_post(&sem_read)) {
@@ -319,7 +319,7 @@ bool time_buffer::tryReadBuffer(int64_t *buffer) {
   // close read semaphore
   if (sem_trywait(&sem_read))
     return false;
-  memcpy(buffer, &this->buffer_, std::min(size_, BUFFER_SIZE));
+  memcpy(buffer, &this->buffer_, std::min(size_, BUFFER_SIZE) * sizeof(int64_t));
   // open write semaphore
   if (sem_post(&sem_write)) {
     perror("sem_post ");
@@ -335,7 +335,7 @@ void time_buffer::readBuffer(int64_t *buffer) {
     perror("sem_wait ");
     exit(EXIT_FAILURE);
   }
-  memcpy(buffer, &this->buffer_, std::min(size_, BUFFER_SIZE));
+  memcpy(buffer, &this->buffer_, std::min(size_, BUFFER_SIZE) * sizeof(int64_t));
   // open write semaphore
   if (sem_post(&sem_write)) {
     perror("sem_post ");

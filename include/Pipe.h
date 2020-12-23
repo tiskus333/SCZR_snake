@@ -29,7 +29,7 @@ void pipeReceive(const int pipe_read_fd, T *p_write_to, size_t data_size)
 
 int64_t getTimestamp()
 {
-  return std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+  return std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
 
 #endif

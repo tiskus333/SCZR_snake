@@ -103,7 +103,7 @@ void processA() {
   
   // timestamps
   time_buffer *timer_a = openSharedTimerBuffer(TIMER_A);
-  int64_t *buffer = new int64_t[BUFFER_SIZE];
+  int64_t *buffer = new int64_t[BUFFER_SIZE]{0};
   int size = 0;
 
   cv::Mat frame;
